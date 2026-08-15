@@ -4,6 +4,7 @@
   "description": "Desktop manager for Crush models, skills, MCP, and every crushrc/schema config family",
   "main": "electron/main.js",
   "productName": "Crush Setup",
+  "author": "ethanfly",
   "bin": {
     "crush-setup": "bin/crush-setup.js"
   },
