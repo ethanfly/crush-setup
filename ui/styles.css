@@ -296,6 +296,61 @@ html[lang="en"] .nav-slots-title { text-transform: uppercase; }
   z-index: 50;
 }
 
+.crush-agent {
+  margin-top: 10px;
+  padding: 10px 8px 0;
+  border-top: 1px solid var(--char);
+}
+
+.crush-agent-title {
+  font-size: 11px;
+  color: var(--dolly);
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+html[lang="en"] .crush-agent-title { text-transform: uppercase; }
+
+.crush-agent-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--salt);
+  min-width: 0;
+}
+
+.crush-agent-line span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crush-agent-sub {
+  font-size: 11px;
+  color: var(--oyster);
+  margin: 4px 0 8px;
+  line-height: 1.35;
+  word-break: break-all;
+}
+
+.crush-agent .dot.off {
+  background: var(--iron);
+}
+
+.crush-agent .dot.busy {
+  background: var(--butter);
+}
+
+.crush-agent button {
+  width: 100%;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .nav-foot {
   font-size: 11px;
   color: var(--oyster);
@@ -845,7 +900,7 @@ textarea {
   .shell { grid-template-columns: 1fr; }
   .nav { flex-direction: row; overflow-x: auto; align-items: center; }
   .nav-list { flex-direction: row; }
-  .nav-foot, .brand-sub { display: none; }
+  .nav-foot, .brand-sub, .crush-agent { display: none; }
   .body { grid-template-columns: 1fr; }
   .titlebar-name { display: none; }
 }

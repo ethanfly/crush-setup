@@ -2,6 +2,7 @@
 
 const { load, save, apply, listSkills, reload } = require("./persist");
 const { discoverModels } = require("./discover");
+const { getStatus, installCrush } = require("./install");
 const {
   SECTIONS,
   PROVIDER_TYPES,
@@ -49,7 +50,14 @@ function createHost() {
     async apply(op, args) {
       if (!session) throw new Error("nothing loaded");
       session = apply(session, op, args);
+      save(session);
       return this.state();
+    },
+    async installStatus() {
+      return getStatus();
+    },
+    async installCrush(opts = {}) {
+      return installCrush(opts);
     },
     state() {
       if (!session) return { loaded: false };
@@ -58,6 +66,7 @@ function createHost() {
         document: session.document,
         loadedPaths: session.loadedPaths,
         writeTarget: session.writeTarget,
+        lastWrite: session.lastWrite || null,
         projectDir: session.projectDir,
         writeScope: session.writeScope,
         paths: {

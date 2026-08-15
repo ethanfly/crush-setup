@@ -11,7 +11,7 @@
   "scripts": {
     "start": "electron .",
     "desktop": "node bin/crush-setup.js",
-    "test": "node --test test/persist.test.js",
+    "test": "node --test test/persist.test.js test/install.test.js",
     "probe": "node test/persist-probe.js",
     "self-check": "node bin/crush-setup.js --self-check",
     "version:next": "node scripts/next-version.js",

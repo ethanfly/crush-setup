@@ -70,6 +70,13 @@ function createServer({ host = createHost(), uiDir } = {}) {
         const body = await readBody(req);
         return send(res, 200, await host.discoverModels(body));
       }
+      if (url.pathname === "/api/install-status" && req.method === "GET") {
+        return send(res, 200, await host.installStatus());
+      }
+      if (url.pathname === "/api/install" && req.method === "POST") {
+        const body = await readBody(req);
+        return send(res, 200, await host.installCrush(body || {}));
+      }
       if (url.pathname === "/api/self-check" && req.method === "GET") {
         const os = require("node:os");
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crush-setup-self-"));

@@ -16,7 +16,7 @@
     "nav.permissions": "Permissions",
     "nav.options": "Options",
     "nav.env": "Env & tools",
-    "nav.foot": "writes crush.json / crushrc",
+    "nav.foot": "auto-saves crush.json / crushrc",
     "scope.global": "Global",
     "scope.project": "Project",
     "project.placeholder": "Project directory",
@@ -134,6 +134,23 @@
     "status.loaded": "Loaded {n} file(s). Write → {path}",
     "status.saved": "Saved {path}",
     "status.reloaded": "Reloaded",
+    "hint.autosave": "Changes save automatically. Click to write again.",
+    "crush.title": "Crush agent",
+    "crush.ready": "Crush {version}",
+    "crush.missing": "Crush is not installed",
+    "crush.via": "Install with {method}",
+    "crush.noInstaller": "Need winget, Scoop, Homebrew, or npm",
+    "crush.install": "Install Crush",
+    "crush.update": "Update Crush",
+    "crush.recheck": "Check again",
+    "crush.installing": "Installing with {method}…",
+    "crush.installingBtn": "Installing…",
+    "crush.installWait": "This can take a few minutes.",
+    "crush.installOk": "Crush {version} is ready",
+    "crush.installFail": "Could not install Crush",
+    "crush.busy": "An install is already running",
+    "crush.unknownVersion": "installed",
+    "crush.pending": "Installed. Restart this app or open a new terminal to refresh PATH.",
     "status.permHint": "Use Add to create a new allow/deny entry.",
     "discover.label": "Fetch models",
     "discover.fetch": "Fetch model list",
@@ -235,7 +252,7 @@
     "nav.permissions": "权限",
     "nav.options": "选项",
     "nav.env": "环境与工具",
-    "nav.foot": "写入 crush.json / crushrc",
+    "nav.foot": "改完自动保存 crush.json / crushrc",
     "scope.global": "全局",
     "scope.project": "项目",
     "project.placeholder": "项目目录",
@@ -353,6 +370,23 @@
     "status.loaded": "已加载 {n} 个文件。写入 → {path}",
     "status.saved": "已保存 {path}",
     "status.reloaded": "已重新加载",
+    "hint.autosave": "修改后会自动保存。点击可再写一次。",
+    "crush.title": "Crush 智能体",
+    "crush.ready": "Crush {version}",
+    "crush.missing": "尚未安装 Crush",
+    "crush.via": "使用 {method} 安装",
+    "crush.noInstaller": "需要 winget、Scoop、Homebrew 或 npm",
+    "crush.install": "一键安装 Crush",
+    "crush.update": "更新 Crush",
+    "crush.recheck": "重新检测",
+    "crush.installing": "正在通过 {method} 安装…",
+    "crush.installingBtn": "安装中…",
+    "crush.installWait": "可能需要几分钟。",
+    "crush.installOk": "Crush {version} 已就绪",
+    "crush.installFail": "无法安装 Crush",
+    "crush.busy": "正在安装，请稍候",
+    "crush.unknownVersion": "已安装",
+    "crush.pending": "已安装。请重启本应用或新开终端以刷新 PATH。",
     "status.permHint": "请用「添加」新建允许 / 拒绝项。",
     "discover.label": "拉取模型",
     "discover.fetch": "拉取模型列表",
@@ -521,6 +555,10 @@
     var arias = doc.querySelectorAll ? doc.querySelectorAll("[data-i18n-aria]") : [];
     for (var a = 0; a < arias.length; a++) {
       arias[a].setAttribute("aria-label", t(arias[a].getAttribute("data-i18n-aria")));
+    }
+    var titles = doc.querySelectorAll ? doc.querySelectorAll("[data-i18n-title]") : [];
+    for (var h = 0; h < titles.length; h++) {
+      titles[h].setAttribute("title", t(titles[h].getAttribute("data-i18n-title")));
     }
     var langBtns = doc.querySelectorAll ? doc.querySelectorAll("[data-lang]") : [];
     for (var b = 0; b < langBtns.length; b++) {

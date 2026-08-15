@@ -48,6 +48,7 @@
     mode: "none",
     discovered: {},
     editingModel: null,
+    crush: null,
   };
 
   function $(id) {
@@ -107,6 +108,20 @@
       },
       discoverModels: function (opts) {
         return fetch("/api/discover-models", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(opts || {}),
+        }).then(function (r) {
+          return r.json();
+        });
+      },
+      installStatus: function () {
+        return fetch("/api/install-status").then(function (r) {
+          return r.json();
+        });
+      },
+      installCrush: function (opts) {
+        return fetch("/api/install", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(opts || {}),
@@ -1001,7 +1016,7 @@
       try {
         saveProvider()
           .then(function (pid) {
-            if (pid) showStatus(t("status.saved", { path: pid }), "ok");
+            if (!pid) return;
             renderSidebarSlots();
             renderListKeepForm();
           })
@@ -1381,10 +1396,132 @@
       .then(function (next) {
         if (next && next.error) throw new Error(next.error);
         if (next && next.document) state.data = next;
+        if (next && next.lastWrite && next.lastWrite.path) {
+          showStatus(t("status.saved", { path: next.lastWrite.path }), "ok");
+        }
         if (!skipRefresh) return refresh(true);
       })
       .catch(function (err) {
         showStatus(err.message || String(err), "error");
+      });
+  }
+
+  function crushMethodLabel(s) {
+    return (s && (s.preferredLabel || s.preferred || s.method)) || "";
+  }
+
+  function renderCrushAgent() {
+    var box = $("crushAgent");
+    if (!box) return;
+    var s = state.crush || {};
+    var installing = Boolean(s.installing);
+    var method = crushMethodLabel(s);
+    var line;
+    var sub;
+    var btnLabel;
+    var disabled = installing;
+    var dotClass = "dot";
+    if (installing) {
+      line = t("crush.installing", { method: method || "…" });
+      sub = t("crush.installWait");
+      btnLabel = t("crush.installingBtn");
+      dotClass += " busy";
+    } else if (s.installed) {
+      line = t("crush.ready", { version: s.version || t("crush.unknownVersion") });
+      sub = s.path || "";
+      btnLabel = method ? t("crush.update") : t("crush.recheck");
+      disabled = false;
+    } else if (s.pendingPath) {
+      line = t("crush.missing");
+      sub = t("crush.pending");
+      btnLabel = t("crush.recheck");
+      dotClass += " off";
+    } else if (method) {
+      line = t("crush.missing");
+      sub = t("crush.via", { method: method });
+      btnLabel = t("crush.install");
+      dotClass += " off";
+    } else {
+      line = t("crush.missing");
+      sub = t("crush.noInstaller");
+      btnLabel = t("crush.recheck");
+      dotClass += " off";
+    }
+    box.innerHTML =
+      '<div class="crush-agent-title">' +
+      esc(t("crush.title")) +
+      '</div><div class="crush-agent-line"><span class="' +
+      dotClass +
+      '"></span><span>' +
+      esc(line) +
+      '</span></div><div class="crush-agent-sub">' +
+      esc(sub) +
+      '</div><button type="button" class="' +
+      (s.installed || installing ? "ghost" : "primary") +
+      ' small" id="installCrushBtn"' +
+      (disabled ? " disabled" : "") +
+      ">" +
+      esc(btnLabel) +
+      "</button>";
+    var btn = $("installCrushBtn");
+    if (btn) btn.onclick = onInstallCrush;
+  }
+
+  function refreshCrushAgent() {
+    if (!api || !api.installStatus) {
+      renderCrushAgent();
+      return Promise.resolve();
+    }
+    return Promise.resolve(api.installStatus())
+      .then(function (s) {
+        var installing = state.crush && state.crush.installing;
+        state.crush = Object.assign({}, s, { installing: installing });
+        renderCrushAgent();
+      })
+      .catch(function () {
+        renderCrushAgent();
+      });
+  }
+
+  function onInstallCrush() {
+    if (!api) {
+      showStatus(t("err.noHost"), "error");
+      return;
+    }
+    var s = state.crush || {};
+    if (s.installing) return;
+    if (!s.preferred && api.installStatus && !s.installed) {
+      refreshCrushAgent();
+      return;
+    }
+    if (!api.installCrush) {
+      refreshCrushAgent();
+      return;
+    }
+    if (!s.preferred && s.installed) {
+      refreshCrushAgent();
+      return;
+    }
+    state.crush = Object.assign({}, s, { installing: true });
+    renderCrushAgent();
+    Promise.resolve(api.installCrush({ method: s.preferred || undefined }))
+      .then(function (res) {
+        state.crush = Object.assign({}, res, { installing: false });
+        if (res && res.ok && res.installed) {
+          showStatus(t("crush.installOk", { version: res.version || t("crush.unknownVersion") }), "ok");
+        } else if (res && res.ok && res.pendingPath) {
+          showStatus(t("crush.pending"), "ok");
+        } else if (res && res.busy) {
+          showStatus(t("crush.busy"), "error");
+        } else {
+          showStatus((res && res.error) || t("crush.installFail"), "error");
+        }
+        renderCrushAgent();
+      })
+      .catch(function (err) {
+        state.crush = Object.assign({}, state.crush, { installing: false });
+        showStatus(err.message || t("crush.installFail"), "error");
+        renderCrushAgent();
       });
   }
 
@@ -1573,6 +1710,7 @@
   function applyLocale() {
     if (window.crushI18n) window.crushI18n.applyStatic();
     showFileHint();
+    renderCrushAgent();
     renderList();
     if (state.selected && state.data && state.data.document) {
       if (state.section === "models") openProvider(state.selected);
@@ -1593,5 +1731,7 @@
   bindChrome();
   showFileHint();
   renderList();
+  renderCrushAgent();
   if (api) doLoad();
+  refreshCrushAgent();
 })();

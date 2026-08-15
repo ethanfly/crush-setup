@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld("crushSetup", {
   state: () => ipcRenderer.invoke("crush:state"),
   pickDirectory: () => ipcRenderer.invoke("crush:pick-directory"),
   discoverModels: (opts) => ipcRenderer.invoke("crush:discover-models", opts),
+  installStatus: () => ipcRenderer.invoke("crush:install-status"),
+  installCrush: (opts) => ipcRenderer.invoke("crush:install", opts),
   window: {
     minimize: () => ipcRenderer.invoke("win:minimize"),
     maximize: () => ipcRenderer.invoke("win:maximize"),

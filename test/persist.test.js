@@ -604,6 +604,10 @@ describe("crush-setup persist", () => {
     assert.match(html, /data-section="options"/);
     assert.match(html, /id="addBtn"/);
     assert.match(html, /id="saveBtn"/);
+    assert.match(html, /id="crushAgent"/);
+    assert.match(js, /installCrush/);
+    assert.match(js, /lastWrite/);
+    assert.match(main, /crush:install/);
     assert.match(html, /i18n\.js/);
     assert.match(html, /data-i18n="nav.models"/);
     assert.match(html, /data-lang="zh"/);
@@ -632,6 +636,23 @@ describe("crush-setup persist", () => {
     assert.match(entry, /--self-check/);
     assert.match(main, /Crush Setup/);
     assert.match(main, /loadFile/);
+  });
+
+  it("host.apply writes the overlay immediately", async () => {
+    const { createHost } = require("../src/session-host");
+    const host = createHost();
+    await host.load({ projectDir: box.project, env: box.env, writeScope: "project" });
+    const next = await host.apply("upsertProvider", [
+      { id: "auto-save", type: "openai-compat", name: "Auto Save", base_url: "http://localhost" },
+    ]);
+    assert.ok(next.lastWrite && next.lastWrite.path, "apply returns lastWrite");
+    assert.ok(next.document.providers["auto-save"]);
+    const again = persistApi.load({ projectDir: box.project, env: box.env, writeScope: "project" });
+    assert.ok(again.document.providers["auto-save"], "provider present after apply without save()");
+    assert.equal(again.document.providers["auto-save"].name, "Auto Save");
+    await host.apply("removeProvider", ["auto-save"]);
+    const gone = persistApi.load({ projectDir: box.project, env: box.env, writeScope: "project" });
+    assert.equal(gone.document.providers["auto-save"], undefined);
   });
 
   it("option + option ui + env + tools persist", () => {

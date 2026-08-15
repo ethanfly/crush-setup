@@ -51,6 +51,8 @@ Manages Crush **providers & models, skills, MCP, LSP, hooks, permissions, option
 - 选项与 option ui、`env`、`tools`
 - 中英文自动适配，可手动切换
 - 单实例窗口，自定义标题栏
+- 一键安装 / 更新 Crush（Windows 优先 winget，其次 Scoop / npm；macOS / Linux 用 Homebrew 或 npm）
+- 修改配置后自动保存，不必再点保存
 
 ## 安装 · Install
 
