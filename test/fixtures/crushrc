@@ -1,0 +1,13 @@
+# Fixture crushrc — builtin commands only
+provider add fixture-compat --name "Fixture Compat" --type openai-compat --base-url "https://api.example.com/v1" --api-key "$EXAMPLE_KEY"
+model add fixture-compat/local-model --name "Local Model" --context-window 32000 --default-max-tokens 2048 --can-reason false --supports-images true --price-input 0 --price-output 0
+model large fixture-compat/local-model --max-tokens 1024 --temperature 0.2
+mcp add fixture-http --type http --url "https://api.githubcopilot.com/mcp/" --header Authorization "Bearer $GH_PAT" --timeout 20 --oauth true --oauth-client-id abc --oauth-callback-port 8787
+lsp add rust --command rust-analyzer --filetypes rs --root-markers Cargo.toml --timeout 45
+hook add PreToolUse --command "./hooks/log.sh" --name log-bash --matcher "^bash$" --timeout 8
+permissions allow view grep
+permissions deny edit
+option progress true
+option skill-path ./rc-skills
+option debug false
+option ui compact true

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "providers": {
+    "fixture-openai": {
+      "id": "fixture-openai",
+      "name": "Fixture OpenAI",
+      "type": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "$OPENAI_API_KEY",
+      "disable": false,
+      "models": [
+        {
+          "id": "gpt-4o",
+          "name": "GPT-4o",
+          "cost_per_1m_in": 2.5,
+          "cost_per_1m_out": 10,
+          "cost_per_1m_in_cached": 1.25,
+          "cost_per_1m_out_cached": 0,
+          "context_window": 128000,
+          "default_max_tokens": 4096,
+          "can_reason": true,
+          "supports_attachments": true
+        }
+      ]
+    }
+  },
+  "models": {
+    "large": {
+      "provider": "fixture-openai",
+      "model": "gpt-4o",
+      "think": true
+    }
+  },
+  "mcp": {
+    "fixture-stdio": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+      "env": {
+        "ROOT": "/tmp"
+      },
+      "timeout": 15,
+      "disabled": false
+    }
+  },
+  "lsp": {
+    "go": {
+      "command": "gopls",
+      "args": ["serve"],
+      "env": {
+        "GOPATH": "/go"
+      },
+      "filetypes": ["go", "mod"],
+      "root_markers": ["go.mod"],
+      "timeout": 30,
+      "disabled": false,
+      "init_options": {
+        "completeUnimported": true
+      },
+      "options": {
+        "hoverKind": "FullDocumentation"
+      }
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "name": "no-haskell",
+        "matcher": "^bash$",
+        "command": "./hooks/no-haskell.sh",
+        "timeout": 10
+      }
+    ]
+  },
+  "permissions": {
+    "allowed_tools": ["view", "ls"]
+  },
+  "options": {
+    "progress": true,
+    "debug": false,
+    "skills_paths": ["./extra-skills"],
+    "disabled_tools": ["bash"]
+  },
+  "env": {
+    "FIXTURE_ENV": "json"
+  },
+  "tools": {
+    "ls": {
+      "max_depth": 4,
+      "max_items": 200
+    }
+  }
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crush Setup</title>
+    <link rel="icon" type="image/png" href="icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="titlebar">
+        <div class="titlebar-drag">
+          <img class="mark sm" src="icon.png" alt="" />
+          <span class="titlebar-name">Crush Setup</span>
+        </div>
+        <div class="titlebar-right">
+          <div class="lang-switch" role="group" data-i18n-aria="lang.label" aria-label="Language">
+            <button type="button" class="lang-btn" data-lang="auto" data-i18n="lang.auto">Auto</button>
+            <button type="button" class="lang-btn" data-lang="zh" data-i18n="lang.zh">中文</button>
+            <button type="button" class="lang-btn" data-lang="en" data-i18n="lang.en">English</button>
+          </div>
+          <div class="win-controls" hidden>
+            <button type="button" id="winMin" class="win-btn" data-i18n-aria="win.min" aria-label="Minimize">
+              <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+            </button>
+            <button type="button" id="winMax" class="win-btn" data-i18n-aria="win.max" aria-label="Maximize">
+              <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2.4" y="2.4" width="7.2" height="7.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+            </button>
+            <button type="button" id="winClose" class="win-btn close" data-i18n-aria="win.close" aria-label="Close">
+              <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3L3 9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div class="shell">
+        <aside class="nav" id="navigator">
+          <div class="brand">
+            <img class="mark" src="icon.png" alt="" />
+            <div>
+              <div class="brand-name">Crush Setup</div>
+              <div class="brand-sub" data-i18n="brand.sub">config manager</div>
+            </div>
+          </div>
+          <nav class="nav-list" data-i18n-aria="nav.aria" aria-label="Sections">
+            <button class="nav-item active" data-section="models" data-i18n="nav.models">Models</button>
+            <button class="nav-item" data-section="skills" data-i18n="nav.skills">Skills</button>
+            <button class="nav-item" data-section="mcp" data-i18n="nav.mcp">MCP</button>
+            <button class="nav-item" data-section="lsp" data-i18n="nav.lsp">LSP</button>
+            <button class="nav-item" data-section="hooks" data-i18n="nav.hooks">Hooks</button>
+            <button class="nav-item" data-section="permissions" data-i18n="nav.permissions">Permissions</button>
+            <button class="nav-item" data-section="options" data-i18n="nav.options">Options</button>
+            <button class="nav-item" data-section="env" data-i18n="nav.env">Env &amp; tools</button>
+          </nav>
+          <div class="nav-slots" id="modelSlots">
+            <div class="nav-slots-title" data-i18n="slots.title">Current models</div>
+            <div id="slotLarge" class="nav-slot"></div>
+            <div id="slotSmall" class="nav-slot"></div>
+          </div>
+          <div class="nav-foot">
+            <span class="dot"></span>
+            <span data-i18n="nav.foot">writes crush.json / crushrc</span>
+          </div>
+        </aside>
+
+        <main class="workspace">
+          <header class="topbar">
+            <div class="scopes" role="tablist">
+              <button class="scope active" data-scope="global" data-i18n="scope.global">Global</button>
+              <button class="scope" data-scope="project" data-i18n="scope.project">Project</button>
+            </div>
+            <div class="project-path">
+              <input id="projectDir" type="text" data-i18n-placeholder="project.placeholder" placeholder="Project directory" spellcheck="false" />
+              <button type="button" id="browseProject" class="ghost" data-i18n="btn.browse">Browse</button>
+            </div>
+            <div class="actions">
+              <button type="button" id="reloadBtn" class="ghost" data-i18n="btn.reload">Reload</button>
+              <button type="button" id="saveBtn" class="primary" data-i18n="btn.save">Save</button>
+            </div>
+          </header>
+          <div id="status" class="status" hidden></div>
+          <div id="fileHint" class="file-hint" hidden></div>
+          <section class="body">
+            <div class="list-pane">
+              <div class="list-head">
+                <h1 id="sectionTitle">Models</h1>
+                <button type="button" id="addBtn" class="primary small">Add</button>
+              </div>
+              <div id="list" class="card-list"></div>
+            </div>
+            <div class="detail-pane">
+              <form id="form" class="form" hidden></form>
+              <div id="emptyDetail" class="empty" data-i18n="empty.detail">Select an item or click Add.</div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script src="i18n.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
