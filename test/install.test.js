@@ -54,6 +54,28 @@ describe("crush install helpers", () => {
     });
     assert.ok(found);
     assert.equal(path.basename(found).toLowerCase(), "winget.exe");
+
+    const sensitive = {
+      statSync(filePath) {
+        const dir = path.dirname(filePath);
+        const base = path.basename(filePath);
+        const names = fs.readdirSync(dir);
+        if (!names.includes(base)) {
+          const err = new Error(`ENOENT: ${filePath}`);
+          err.code = "ENOENT";
+          throw err;
+        }
+        return fs.statSync(filePath);
+      },
+    };
+    const ciFound = whichCommand("winget", {
+      platform: "win32",
+      env: { PATH: bin, PATHEXT: ".EXE;.CMD" },
+      fsMod: sensitive,
+      pathMod: path,
+    });
+    assert.ok(ciFound, "win32 PATHEXT match must work on a case-sensitive FS");
+    assert.equal(path.basename(ciFound), "winget.exe");
   });
 
   it("whichCommand checks extra dirs for crush", () => {

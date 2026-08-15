@@ -94,6 +94,24 @@ function isFile(filePath, fsMod) {
   }
 }
 
+function pathextVariants(ext) {
+  const raw = ext.startsWith(".") ? ext : `.${ext}`;
+  return [...new Set([raw, raw.toLowerCase(), raw.toUpperCase()])];
+}
+
+// Windows lookup is case-insensitive; CI Linux is not. Try common casings.
+function existingFile(filePath, fsMod, pathMod, platform) {
+  if (isFile(filePath, fsMod)) return filePath;
+  if (platform !== "win32") return null;
+  const dir = pathMod.dirname(filePath);
+  const base = pathMod.basename(filePath);
+  for (const name of [base.toLowerCase(), base.toUpperCase()]) {
+    const candidate = pathMod.join(dir, name);
+    if (candidate !== filePath && isFile(candidate, fsMod)) return candidate;
+  }
+  return null;
+}
+
 function extraDirsFor(name, env, platform, pathMod) {
   const home = env.HOME || env.USERPROFILE || "";
   const local = env.LOCALAPPDATA || (home ? pathMod.join(home, "AppData", "Local") : "");
@@ -141,16 +159,20 @@ function whichCommand(name, opts = {}) {
     if (!dir) continue;
     const base = pathMod.join(dir, name);
     if (hasExt) {
-      if (isFile(base, fsMod)) return base;
+      const hit = existingFile(base, fsMod, pathMod, platform);
+      if (hit) return hit;
       continue;
     }
     if (platform === "win32") {
       for (const ext of exts) {
-        const candidate = ext.startsWith(".") ? base + ext : `${base}.${ext}`;
-        if (isFile(candidate, fsMod)) return candidate;
+        for (const variant of pathextVariants(ext)) {
+          const hit = existingFile(base + variant, fsMod, pathMod, platform);
+          if (hit) return hit;
+        }
       }
     }
-    if (isFile(base, fsMod)) return base;
+    const bare = existingFile(base, fsMod, pathMod, platform);
+    if (bare) return bare;
   }
   return null;
 }
