@@ -1,18 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <defs>
-    <linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8b75ff"/>
-      <stop offset="45%" stop-color="#6b50ff"/>
-      <stop offset="100%" stop-color="#ff60ff"/>
-    </linearGradient>
-    <linearGradient id="glyph" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fffaf1"/>
-      <stop offset="100%" stop-color="#68ffd6"/>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c63c2"/>
+      <stop offset="52%" stop-color="#f0a8cc"/>
+      <stop offset="100%" stop-color="#f3dc7a"/>
     </linearGradient>
   </defs>
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="#201f26"/>
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="none" stroke="url(#neon)" stroke-width="10"/>
-  <rect x="34" y="34" width="188" height="188" rx="40" fill="none" stroke="#6b50ff" stroke-opacity="0.28" stroke-width="2"/>
-  <path d="M 152 72 L 104 72 L 104 184 L 152 184" fill="none" stroke="url(#glyph)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" transform="translate(14 0)"/>
-  <rect x="188" y="158" width="22" height="22" rx="5" fill="#68ffd6"/>
+  <rect width="256" height="256" rx="56" fill="url(#g)"/>
 </svg>

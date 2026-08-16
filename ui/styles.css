@@ -485,52 +485,67 @@ button.primary,
 button.ghost,
 button.danger {
   appearance: none;
-  border-radius: var(--radius-sm);
-  padding: 7px 13px;
+  border-radius: 999px;
+  padding: 7px 16px;
   cursor: pointer;
   border: 1px solid transparent;
   white-space: nowrap;
-  transition: box-shadow 0.14s ease, background 0.14s ease, border-color 0.14s ease, transform 0.06s ease;
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.03em;
+  transition: box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease, transform 0.08s ease, color 0.16s ease;
 }
 
 button.primary:active,
 button.ghost:active,
-button.danger:active { transform: translateY(1px); }
+button.danger:active { transform: translateY(1px) scale(0.985); }
 
 button.primary {
-  background: linear-gradient(135deg, var(--charple), var(--larple));
+  background: linear-gradient(135deg, var(--hazy), var(--charple) 55%, var(--larple));
   color: var(--butter);
-  border-color: var(--hazy);
-  box-shadow: 0 0 14px var(--glow-charple), inset 0 1px 0 rgba(255, 250, 241, 0.18);
+  border-color: rgba(255, 250, 241, 0.22);
+  box-shadow:
+    0 0 16px var(--glow-charple),
+    inset 0 1px 0 rgba(255, 250, 241, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 2px rgba(32, 31, 38, 0.5);
 }
 
-button.primary:hover { box-shadow: 0 0 20px var(--glow-charple), inset 0 1px 0 rgba(255, 250, 241, 0.22); }
+button.primary:hover {
+  box-shadow:
+    0 0 24px var(--glow-charple),
+    0 0 6px var(--glow-dolly),
+    inset 0 1px 0 rgba(255, 250, 241, 0.34);
+  filter: brightness(1.1);
+}
 
 button.ghost {
-  background: transparent;
-  color: var(--sash);
+  background: rgba(45, 44, 54, 0.5);
+  color: var(--smoke);
   border-color: var(--iron);
 }
 
 button.ghost:hover {
   border-color: var(--hazy);
   color: var(--salt);
-  box-shadow: 0 0 10px rgba(139, 117, 255, 0.18);
+  background: rgba(58, 57, 67, 0.65);
+  box-shadow: 0 0 12px rgba(139, 117, 255, 0.22);
 }
 
 button.danger {
-  background: transparent;
-  color: var(--coral);
-  border-color: rgba(255, 87, 125, 0.4);
+  background: rgba(255, 87, 125, 0.08);
+  color: var(--tuna);
+  border-color: rgba(255, 87, 125, 0.35);
 }
 
 button.danger:hover {
-  background: rgba(255, 87, 125, 0.12);
+  background: rgba(255, 87, 125, 0.16);
   border-color: var(--coral);
-  box-shadow: 0 0 10px rgba(255, 87, 125, 0.25);
+  color: var(--coral);
+  box-shadow: 0 0 12px rgba(255, 87, 125, 0.3);
 }
 
-button.small { padding: 5px 10px; font-size: 12px; }
+button.small { padding: 4px 12px; font-size: 11.5px; }
 
 .status {
   padding: 6px 18px;
