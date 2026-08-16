@@ -316,6 +316,33 @@ describe("crush-setup persist", () => {
     assert.equal(session.document.env.FROM_MACHINE, "yes");
   });
 
+  it("setModelSlot is not shadowed by machine last-used models", () => {
+    const machineDir = path.join(box.ladd, "crush");
+    fs.mkdirSync(machineDir, { recursive: true });
+    const machinePath = path.join(machineDir, "crush.json");
+    fs.writeFileSync(
+      machinePath,
+      JSON.stringify({
+        models: { large: { provider: "hyper", model: "kimi-k3" } },
+        env: { FROM_MACHINE: "yes" },
+      }),
+    );
+    let session = loadIn(box);
+    session = persistApi.apply(session, "upsertProvider", [{ id: "api-merge", type: "openai-compat", name: "Merge" }]);
+    session = persistApi.apply(session, "upsertModel", ["api-merge", { id: "glm-5.3", name: "GLM" }]);
+    session = persistApi.apply(session, "setModelSlot", ["large", { provider: "api-merge", model: "glm-5.3" }]);
+    persistApi.save(session);
+    assert.equal(session.document.models.large.provider, "api-merge");
+    assert.equal(session.document.models.large.model, "glm-5.3");
+    assert.equal(session.document.env.FROM_MACHINE, "yes");
+    const machine = JSON.parse(fs.readFileSync(machinePath, "utf8"));
+    assert.equal(machine.models.large.provider, "api-merge");
+    assert.equal(machine.models.large.model, "glm-5.3");
+    session = persistApi.reload(session);
+    assert.equal(session.document.models.large.provider, "api-merge");
+    assert.equal(session.document.models.large.model, "glm-5.3");
+  });
+
   it("does not overwrite a sibling user crushrc when writing complementary JSON", () => {
     const userRc = path.join(box.project, "crushrc");
     fs.writeFileSync(userRc, "if [[ $HOSTNAME == x ]]; then\n  option debug true\nfi\n");

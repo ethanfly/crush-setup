@@ -74,12 +74,25 @@ function complementarySiblingPath(writeTarget) {
   return siblingJsonPath(writeTarget.path);
 }
 
+// Crush's %LOCALAPPDATA%\crush\crush.json is runtime state (last-used
+// slots, oauth, recent_models). Slot selections there must not hide the
+// user's configured models.large / models.small while editing.
+function docForMerge(layer) {
+  const doc = layer && layer.document;
+  if (!doc || layer.scope !== "machine") return doc;
+  if (!doc.models) return doc;
+  const next = { ...doc };
+  delete next.models;
+  return next;
+}
+
 function rebuildDocument(session) {
   const sibling = complementarySiblingPath(session.writeTarget);
   const byPath = new Map();
   for (const layer of session.loaded || []) {
     if (sibling && layer.path === sibling) continue;
-    if (layer.document) byPath.set(layer.path, layer.document);
+    const doc = docForMerge(layer);
+    if (doc) byPath.set(layer.path, doc);
   }
   if (session.writeTarget && session.writeTarget.path) {
     byPath.set(session.writeTarget.path, session.overlay || emptyDocument());
@@ -90,6 +103,30 @@ function rebuildDocument(session) {
     if (byPath.has(candidate.path)) docs.push(byPath.get(candidate.path));
   }
   return docs.length ? mergeDocuments(docs) : emptyDocument();
+}
+
+function patchMachineModelSlots(session) {
+  const machinePath = session.paths && session.paths.machineJson;
+  if (!machinePath) return;
+  const text = readFileIfPresent(machinePath);
+  if (text == null || !String(text).trim()) return;
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return;
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
+  const slots = asMap(session.overlay && session.overlay.models);
+  if (!slots.large && !slots.small) return;
+  raw.models = asMap(raw.models);
+  if (slots.large) raw.models.large = clone(slots.large);
+  if (slots.small) raw.models.small = clone(slots.small);
+  atomicWriteFile(machinePath, `${JSON.stringify(raw)}\n`);
+  const layer = (session.loaded || []).find((l) => l.scope === "machine" && l.path === machinePath);
+  if (layer && layer.document) {
+    layer.document = { ...layer.document, models: clone(raw.models) };
+  }
 }
 
 /**
@@ -249,6 +286,7 @@ function reload(session) {
 function apply(session, op, args) {
   if (!session.overlay) session.overlay = emptyDocument();
   session.overlay = applyOp(session.overlay, op, args);
+  if (op === "setModelSlot") patchMachineModelSlots(session);
   session.document = rebuildDocument(session);
   return session;
 }

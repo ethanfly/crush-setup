@@ -173,7 +173,7 @@
     });
   }
 
-  function customSelectHtml(name, value, options, extraClass) {
+  function customSelectHtml(name, value, options, extraClass, labelledBy) {
     var items = optionItems(options);
     var current = null;
     for (var i = 0; i < items.length; i++) {
@@ -183,10 +183,10 @@
     var lis = items
       .map(function (item) {
         return (
-          '<li role="option" data-value="' +
+          '<li role="option" tabindex="-1" data-value="' +
           esc(item.value) +
           '"' +
-          (item.value === current.value ? ' class="is-on"' : "") +
+          (item.value === current.value ? ' class="is-on" aria-selected="true"' : ' aria-selected="false"') +
           ">" +
           esc(item.label) +
           "</li>"
@@ -206,10 +206,12 @@
       '" value="' +
       esc(current.value) +
       '" />' +
-      '<button type="button" class="cselect-btn" aria-haspopup="listbox">' +
+      '<button type="button" class="cselect-btn" aria-haspopup="listbox" aria-expanded="false"' +
+      (labelledBy ? ' aria-labelledby="' + esc(labelledBy) + '"' : "") +
+      ">" +
       '<span class="cselect-value">' +
       esc(current.label) +
-      "</span><span class=\"cselect-caret\"></span></button>" +
+      "</span><span class=\"cselect-caret\" aria-hidden=\"true\"></span></button>" +
       '<ul class="cselect-menu" hidden role="listbox">' +
       lis +
       "</ul></div>"
@@ -227,34 +229,78 @@
 
   function hintHtml(name, extra) {
     var text = hintFor(name, extra);
-    return text ? '<div class="hint">' + esc(text) + "</div>" : "";
+    return text ? '<div class="hint" id="h-' + esc(name) + '">' + esc(text) + "</div>" : "";
+  }
+
+  function formSection(titleKey, inner, attrs) {
+    attrs = attrs || {};
+    var extra = attrs.className ? " " + attrs.className : "";
+    var id = attrs.id ? ' id="' + esc(attrs.id) + '"' : "";
+    var hidden = attrs.hidden ? " hidden" : "";
+    return (
+      '<fieldset class="form-section' +
+      extra +
+      '"' +
+      id +
+      hidden +
+      "><legend><span>" +
+      esc(t(titleKey)) +
+      "</span></legend>" +
+      inner +
+      "</fieldset>"
+    );
+  }
+
+  function emptyHtml(message) {
+    return (
+      '<div class="empty"><div class="empty-pixel" aria-hidden="true"></div><p>' +
+      esc(message) +
+      "</p></div>"
+    );
   }
 
   function field(name, label, value, type, extra) {
     extra = extra || {};
     var id = "f-" + name;
     var note = hintHtml(name, extra);
+    var described = hintFor(name, extra) ? ' aria-describedby="h-' + esc(name) + '"' : "";
+    var req = extra.required ? " required" : "";
+    var reqMark = extra.required ? '<span class="req" aria-hidden="true">*</span>' : "";
+    var auto = extra.autocomplete ? ' autocomplete="' + esc(extra.autocomplete) + '"' : "";
+    var spell = extra.spellcheck === false ? ' spellcheck="false"' : "";
+    var ro = extra.readonly ? " readonly" : "";
+    var ph = extra.placeholder ? ' placeholder="' + esc(extra.placeholder) + '"' : "";
+    var labelHtml =
+      '<label class="field-label" for="' + id + '" id="l-' + esc(name) + '">' + esc(label) + reqMark + "</label>";
+
     if (type === "select") {
       return (
-        '<div class="field"><label>' +
+        '<div class="field">' +
+        '<span class="field-label" id="l-' +
+        esc(name) +
+        '">' +
         esc(label) +
-        "</label>" +
-        customSelectHtml(name, value, extra.options) +
+        reqMark +
+        "</span>" +
+        customSelectHtml(name, value, extra.options, extra.className, "l-" + name) +
         note +
         "</div>"
       );
     }
     if (type === "textarea") {
       return (
-        '<div class="field"><label for="' +
-        id +
-        '">' +
-        esc(label) +
-        '</label><textarea id="' +
+        '<div class="field">' +
+        labelHtml +
+        '<textarea id="' +
         id +
         '" name="' +
         esc(name) +
-        '">' +
+        '"' +
+        described +
+        req +
+        spell +
+        ro +
+        ">" +
         esc(value || "") +
         "</textarea>" +
         note +
@@ -263,15 +309,18 @@
     }
     if (type === "checkbox") {
       return (
-        '<div class="field"><label class="switch-field">' +
+        '<div class="field"><label class="switch-field" for="' +
+        id +
+        '">' +
         '<input type="checkbox" id="' +
         id +
         '" name="' +
         esc(name) +
         '"' +
         (value ? " checked" : "") +
+        described +
         " />" +
-        '<span class="switch-track"></span>' +
+        '<span class="switch-track" aria-hidden="true"></span>' +
         '<span class="switch-label">' +
         esc(label) +
         "</span></label>" +
@@ -279,27 +328,108 @@
         "</div>"
       );
     }
+    if (type === "secret") {
+      return (
+        '<div class="field">' +
+        labelHtml +
+        '<div class="input-wrap">' +
+        '<input id="' +
+        id +
+        '" name="' +
+        esc(name) +
+        '" type="password" value="' +
+        esc(value == null ? "" : value) +
+        '" spellcheck="false" autocomplete="off"' +
+        described +
+        req +
+        " />" +
+        '<button type="button" class="reveal-btn" data-reveal="' +
+        esc(id) +
+        '" aria-pressed="false">' +
+        esc(t("btn.reveal")) +
+        "</button></div>" +
+        note +
+        "</div>"
+      );
+    }
+    var inputType = type === "number" ? "number" : type === "url" ? "url" : "text";
+    var mode = type === "number" ? ' inputmode="decimal"' : "";
     return (
-      '<div class="field"><label for="' +
-      id +
-      '">' +
-      esc(label) +
-      '</label><input id="' +
+      '<div class="field">' +
+      labelHtml +
+      '<input id="' +
       id +
       '" name="' +
       esc(name) +
       '" type="' +
-      (type || "text") +
+      inputType +
       '" value="' +
       esc(value == null ? "" : value) +
-      '" />' +
+      '"' +
+      described +
+      req +
+      auto +
+      spell +
+      ro +
+      ph +
+      mode +
+      " />" +
       note +
       "</div>"
     );
   }
 
+  function clearFieldErrors(root) {
+    root = root || $("form");
+    if (!root) return;
+    root.querySelectorAll(".field.is-invalid").forEach(function (el) {
+      el.classList.remove("is-invalid");
+    });
+    root.querySelectorAll(".field-error").forEach(function (el) {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    });
+  }
+
+  function setFieldError(name, message) {
+    var el = document.getElementById("f-" + name);
+    var wrap = el && el.closest ? el.closest(".field") : null;
+    if (!wrap) {
+      showStatus(message, "error");
+      return;
+    }
+    wrap.classList.add("is-invalid");
+    var err = wrap.querySelector(".field-error");
+    if (!err) {
+      err = document.createElement("div");
+      err.className = "field-error";
+      err.setAttribute("role", "alert");
+      wrap.appendChild(err);
+    }
+    err.textContent = message;
+    if (el && typeof el.focus === "function") {
+      try {
+        el.focus();
+      } catch (ignore) {
+        /* best-effort */
+      }
+    }
+  }
+
   function bindWidgets(root) {
     if (!root) return;
+    root.querySelectorAll(".reveal-btn").forEach(function (btn) {
+      if (btn.getAttribute("data-bound")) return;
+      btn.setAttribute("data-bound", "1");
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var target = document.getElementById(btn.getAttribute("data-reveal"));
+        if (!target) return;
+        var show = target.type === "password";
+        target.type = show ? "text" : "password";
+        btn.setAttribute("aria-pressed", show ? "true" : "false");
+        btn.textContent = show ? t("btn.hide") : t("btn.reveal");
+      });
+    });
     root.querySelectorAll(".cselect").forEach(function (box) {
       if (box.getAttribute("data-bound")) return;
       box.setAttribute("data-bound", "1");
@@ -307,19 +437,54 @@
       var menu = box.querySelector(".cselect-menu");
       var hidden = box.querySelector("input[type=hidden]");
       var labelEl = box.querySelector(".cselect-value");
+      var items = menu ? menu.querySelectorAll("li") : [];
       function close() {
         box.classList.remove("open");
+        if (btn) btn.setAttribute("aria-expanded", "false");
         if (menu) menu.hidden = true;
+      }
+      function pick(li) {
+        if (!li) return;
+        var value = li.getAttribute("data-value");
+        if (hidden) hidden.value = value;
+        if (labelEl) labelEl.textContent = li.textContent;
+        items.forEach(function (item) {
+          var on = item === li;
+          item.classList.toggle("is-on", on);
+          item.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        close();
+        if (btn) btn.focus();
+        if (typeof box.onchangeBound === "function") box.onchangeBound(value);
+      }
+      function focusItem(index) {
+        if (!items.length) return;
+        var i = index;
+        if (i < 0) i = items.length - 1;
+        if (i >= items.length) i = 0;
+        items[i].focus();
+      }
+      function activeIndex() {
+        for (var i = 0; i < items.length; i++) {
+          if (items[i] === document.activeElement) return i;
+        }
+        for (var j = 0; j < items.length; j++) {
+          if (items[j].classList.contains("is-on")) return j;
+        }
+        return 0;
       }
       function open() {
         document.querySelectorAll(".cselect.open").forEach(function (other) {
           if (other !== box) {
             other.classList.remove("open");
+            var otherBtn = other.querySelector(".cselect-btn");
+            if (otherBtn) otherBtn.setAttribute("aria-expanded", "false");
             var m = other.querySelector(".cselect-menu");
             if (m) m.hidden = true;
           }
         });
         box.classList.add("open");
+        if (btn) btn.setAttribute("aria-expanded", "true");
         if (menu) {
           menu.hidden = false;
           if (box.closest(".nav-slot") && btn && btn.getBoundingClientRect) {
@@ -333,6 +498,8 @@
               menu.style.top = rect.bottom + 4 + "px";
             }
           }
+          var current = menu.querySelector("li.is-on") || items[0];
+          if (current) current.focus();
         }
       }
       if (btn) {
@@ -342,19 +509,41 @@
           if (box.classList.contains("open")) close();
           else open();
         });
+        btn.addEventListener("keydown", function (e) {
+          if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (!box.classList.contains("open")) open();
+          }
+        });
       }
       if (menu) {
-        menu.querySelectorAll("li").forEach(function (li) {
+        items.forEach(function (li) {
           li.addEventListener("click", function (e) {
             e.stopPropagation();
-            var value = li.getAttribute("data-value");
-            if (hidden) hidden.value = value;
-            if (labelEl) labelEl.textContent = li.textContent;
-            menu.querySelectorAll("li").forEach(function (item) {
-              item.classList.toggle("is-on", item === li);
-            });
-            close();
-            if (typeof box.onchangeBound === "function") box.onchangeBound(value);
+            pick(li);
+          });
+          li.addEventListener("keydown", function (e) {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              focusItem(activeIndex() + 1);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              focusItem(activeIndex() - 1);
+            } else if (e.key === "Home") {
+              e.preventDefault();
+              focusItem(0);
+            } else if (e.key === "End") {
+              e.preventDefault();
+              focusItem(items.length - 1);
+            } else if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              pick(li);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              close();
+              if (btn) btn.focus();
+            }
           });
         });
       }
@@ -423,7 +612,7 @@
     renderCrushAgent();
 
     if (!state.data || !state.data.document) {
-      list.innerHTML = '<div class="empty">' + esc(t("empty.load")) + "</div>";
+      list.innerHTML = emptyHtml(t("empty.load"));
       return;
     }
     var doc = state.data.document;
@@ -472,6 +661,17 @@
     return out;
   }
 
+  function slotRef(sel) {
+    if (!sel || !sel.provider || !sel.model) return "";
+    return sel.provider + "/" + sel.model;
+  }
+
+  function parseSlotRef(ref) {
+    var cut = String(ref || "").lastIndexOf("/");
+    if (cut < 1) return null;
+    return { provider: ref.slice(0, cut), model: ref.slice(cut + 1) };
+  }
+
   function renderSidebarSlots() {
     var largeEl = $("slotLarge");
     var smallEl = $("slotSmall");
@@ -481,18 +681,23 @@
     var small = doc && doc.models && doc.models.small;
     var choices = doc ? modelChoices(doc) : [];
     function slotSelect(slot, sel) {
-      var cur = sel ? sel.provider + "/" + sel.model : "";
-      var opts = [{ value: "", label: "—" }].concat(
-        choices.map(function (c) {
-          return { value: c, label: c };
-        }),
-      );
+      var cur = slotRef(sel);
+      var seen = {};
+      var opts = [{ value: "", label: "—" }];
+      choices.forEach(function (c) {
+        if (seen[c]) return;
+        seen[c] = true;
+        opts.push({ value: c, label: c });
+      });
+      if (cur && !seen[cur]) opts.push({ value: cur, label: cur });
+      var hint = hintFor(slot === "small" ? "slot_small" : "slot_large");
       return (
-        '<label>' +
+        '<label title="' +
+        esc(hint) +
+        '">' +
         esc(t(slot === "small" ? "slot.small" : "slot.large")) +
         "</label>" +
-        customSelectHtml("slot-" + slot, cur, opts) +
-        hintHtml(slot === "small" ? "slot_small" : "slot_large")
+        customSelectHtml("slot-" + slot, cur, opts)
       );
     }
     largeEl.innerHTML = slotSelect("large", large);
@@ -503,9 +708,11 @@
       var box = el.querySelector(".cselect");
       if (!box) return;
       box.onchangeBound = function (ref) {
-        if (!ref) return;
-        var cut = ref.indexOf("/");
-        applyOp("setModelSlot", [slot, { provider: ref.slice(0, cut), model: ref.slice(cut + 1) }]);
+        var parsed = parseSlotRef(ref);
+        if (!parsed) return;
+        applyOp("setModelSlot", [slot, parsed], true).then(function () {
+          renderSidebarSlots();
+        });
       };
     }
     bindSlot(largeEl, "large");
@@ -513,7 +720,12 @@
   }
 
   function renderModels(list, doc) {
-    entries(doc.providers).forEach(function (p) {
+    var providers = entries(doc.providers);
+    if (!providers.length) {
+      list.innerHTML = emptyHtml(t("empty.detail"));
+      return;
+    }
+    providers.forEach(function (p) {
       var models = (p.value.models || [])
         .map(function (m) {
           return m.id;
@@ -535,7 +747,12 @@
   }
 
   function renderNamed(list, map, kind, subFn, disabledFn) {
-    entries(map).forEach(function (item) {
+    var named = entries(map);
+    if (!named.length) {
+      list.innerHTML = emptyHtml(t("empty.detail"));
+      return;
+    }
+    named.forEach(function (item) {
       var badges = disabledFn(item.value) ? '<span class="badge off">' + esc(t("badge.disabled")) + "</span>" : "";
       list.insertAdjacentHTML(
         "beforeend",
@@ -551,7 +768,7 @@
   function renderSkills(list) {
     var skills = (state.data && state.data.skills) || [];
     if (!skills.length) {
-      list.innerHTML = '<div class="empty">' + esc(t("empty.skills")) + "</div>";
+      list.innerHTML = emptyHtml(t("empty.skills"));
       return;
     }
     skills.forEach(function (s) {
@@ -571,7 +788,16 @@
   }
 
   function renderHooks(list, doc) {
-    Object.keys(doc.hooks || {}).forEach(function (event) {
+    var events = Object.keys(doc.hooks || {});
+    var count = 0;
+    events.forEach(function (event) {
+      count += (doc.hooks[event] || []).length;
+    });
+    if (!count) {
+      list.innerHTML = emptyHtml(t("empty.detail"));
+      return;
+    }
+    events.forEach(function (event) {
       (doc.hooks[event] || []).forEach(function (h, i) {
         var id = event + "::" + (h.name || String(i));
         list.insertAdjacentHTML(
@@ -586,10 +812,16 @@
   }
 
   function renderPermissions(list, doc) {
-    (doc.permissions.allowed_tools || []).forEach(function (toolName) {
+    var allowed = (doc.permissions && doc.permissions.allowed_tools) || [];
+    var denied = (doc.options && doc.options.disabled_tools) || [];
+    if (!allowed.length && !denied.length) {
+      list.innerHTML = emptyHtml(t("empty.detail"));
+      return;
+    }
+    allowed.forEach(function (toolName) {
       list.insertAdjacentHTML("beforeend", cardHtml("allow:" + toolName, toolName, t("perm.allowSub"), '<span class="badge">' + esc(t("badge.allow")) + "</span>", state.selected === "allow:" + toolName));
     });
-    ((doc.options && doc.options.disabled_tools) || []).forEach(function (toolName) {
+    denied.forEach(function (toolName) {
       list.insertAdjacentHTML("beforeend", cardHtml("deny:" + toolName, toolName, t("perm.denySub"), '<span class="badge off">' + esc(t("badge.deny")) + "</span>", state.selected === "deny:" + toolName));
     });
     bindCards(list, function (id) {
@@ -653,7 +885,7 @@
     }
     form.insertBefore(body, actions || null);
     bindWidgets(form);
-    var first = form.querySelector("input:not([type=hidden]):not([type=checkbox]), textarea");
+    var first = form.querySelector("input:not([type=hidden]):not([type=checkbox]):not([readonly]), textarea:not([readonly])");
     if (first) {
       try {
         first.focus();
@@ -713,9 +945,16 @@
   }
 
   function saveProvider() {
-    var payload = providerPayload();
+    clearFieldErrors();
+    var payload;
+    try {
+      payload = providerPayload();
+    } catch (err) {
+      setFieldError("extra_body", t("err.extraBodyJson"));
+      return Promise.resolve(null);
+    }
     if (!payload.id) {
-      showStatus(t("model.needProvider"), "error");
+      setFieldError("id", t("model.needProvider"));
       return Promise.resolve(null);
     }
     return applyOp("upsertProvider", [payload], true).then(function () {
@@ -736,12 +975,12 @@
       extra =
         '<div class="model-edit">' +
         '<div class="row">' +
-        field("edit_name", t("field.modelName"), m.name || m.id) +
-        field("edit_ctx", t("field.contextWindow"), m.context_window || "") +
+        field("edit_name", t("field.modelName"), m.name || m.id, "text", { spellcheck: false }) +
+        field("edit_ctx", t("field.contextWindow"), m.context_window || "", "number") +
         "</div>" +
         '<div class="row">' +
-        field("edit_max", t("field.defaultMaxTokens"), m.default_max_tokens || "") +
-        field("edit_price_in", t("field.priceIn"), m.cost_per_1m_in || "") +
+        field("edit_max", t("field.defaultMaxTokens"), m.default_max_tokens || "", "number") +
+        field("edit_price_in", t("field.priceIn"), m.cost_per_1m_in || "", "number") +
         "</div>" +
         '<div class="row">' +
         field("edit_reason", t("field.canReason"), m.can_reason, "checkbox") +
@@ -829,14 +1068,14 @@
       "</div>" +
       availHtml +
       '<div class="manual-add">' +
-      "<label>" +
+      '<label class="field-label" for="f-model_id">' +
       esc(t("form.manualModel")) +
       "</label>" +
       '<div class="manual-add-row">' +
-      '<input id="f-model_id" name="model_id" type="text" placeholder="' +
+      '<input id="f-model_id" name="model_id" type="text" spellcheck="false" autocomplete="off" placeholder="' +
       esc(t("field.modelId")) +
       '" />' +
-      '<input id="f-model_name" name="model_name" type="text" placeholder="' +
+      '<input id="f-model_name" name="model_name" type="text" spellcheck="false" placeholder="' +
       esc(t("field.modelName")) +
       '" />' +
       '<button type="button" class="primary" id="addModelBtn">' +
@@ -897,7 +1136,7 @@
       $("addModelBtn").onclick = function () {
         var mid = String(val("model_id") || "").trim();
         if (!mid) {
-          showStatus(t("model.needId"), "error");
+          setFieldError("model_id", t("model.needId"));
           return;
         }
         var name = String(val("model_name") || "").trim() || mid;
@@ -1013,39 +1252,48 @@
     var p = (state.data.document.providers || {})[id] || {};
     state.editingModel = null;
     showForm(
-      field("id", t("field.id"), id) +
-        field("name", t("field.name"), p.name) +
-        field("type", t("field.type"), p.type || "openai", "select", { options: PROVIDER_TYPES }) +
-        field("base_url", t("field.baseUrl"), p.base_url) +
-        field("api_key", t("field.apiKey"), p.api_key) +
-        field("system_prompt_prefix", t("field.systemPromptPrefix"), p.system_prompt_prefix) +
-        '<div class="row">' +
-        field("disable", t("field.disabled"), p.disable, "checkbox") +
-        field("flat_rate", t("field.flatRate"), p.flat_rate, "checkbox") +
-        "</div>" +
-        field("discover_models", t("field.discoverModels"), p.discover_models !== false, "checkbox") +
-        field("extra_headers", t("field.extraHeaders"), kvText(p.extra_headers), "textarea") +
-        field("extra_body", t("field.extraBody"), p.extra_body ? JSON.stringify(p.extra_body, null, 2) : "", "textarea") +
-        "<h2>" + esc(t("form.customModels")) + "</h2>" +
-        '<div id="modelEditor"></div>' +
+      formSection(
+        "form.section.identity",
+        field("id", t("field.id"), id, "text", { required: true, spellcheck: false, autocomplete: "off" }) +
+          field("name", t("field.name"), p.name, "text", { spellcheck: false }) +
+          field("type", t("field.type"), p.type || "openai", "select", { options: PROVIDER_TYPES }),
+      ) +
+        formSection(
+          "form.section.connection",
+          field("base_url", t("field.baseUrl"), p.base_url, "text", { spellcheck: false, autocomplete: "off" }) +
+            field("api_key", t("field.apiKey"), p.api_key, "secret"),
+        ) +
+        formSection(
+          "form.section.flags",
+          '<div class="row">' +
+            field("disable", t("field.disabled"), p.disable, "checkbox") +
+            field("flat_rate", t("field.flatRate"), p.flat_rate, "checkbox") +
+            "</div>" +
+            field("discover_models", t("field.discoverModels"), p.discover_models !== false, "checkbox"),
+        ) +
+        formSection(
+          "form.section.advanced",
+          field("system_prompt_prefix", t("field.systemPromptPrefix"), p.system_prompt_prefix) +
+            field("extra_headers", t("field.extraHeaders"), kvText(p.extra_headers), "textarea", { spellcheck: false }) +
+            field("extra_body", t("field.extraBody"), p.extra_body ? JSON.stringify(p.extra_body, null, 2) : "", "textarea", {
+              spellcheck: false,
+            }),
+        ) +
+        formSection("form.customModels", '<div id="modelEditor"></div>') +
         formButtons(true, true, p.disable),
       modalTitleText("form.providerNew", "form.provider"),
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
-      try {
-        saveProvider()
-          .then(function (pid) {
-            if (!pid) return;
-            state.selected = pid;
-            hideForm();
-          })
-          .catch(function (err) {
-            showStatus(err.message || String(err), "error");
-          });
-      } catch (err) {
-        showStatus(err.message || t("err.extraBodyJson"), "error");
-      }
+      saveProvider()
+        .then(function (pid) {
+          if (!pid) return;
+          state.selected = pid;
+          hideForm();
+        })
+        .catch(function (err) {
+          showStatus(err.message || String(err), "error");
+        });
     };
     wireToggleDelete(
       function () {
@@ -1058,34 +1306,80 @@
     paintModelEditor(id || "");
   }
 
+  function syncMcpTransport() {
+    var type = val("type") || "stdio";
+    var stdio = type === "stdio";
+    var stdioBox = $("mcp-stdio");
+    var httpBox = $("mcp-http");
+    if (stdioBox) stdioBox.hidden = !stdio;
+    if (httpBox) httpBox.hidden = stdio;
+  }
+
+  function syncMcpOauth() {
+    var box = $("mcp-oauth-fields");
+    if (box) box.hidden = !val("oauth");
+  }
+
   function openMcp(id) {
-    var m = state.data.document.mcp[id] || {};
+    var m = ((state.data.document.mcp || {})[id]) || {};
+    var transport = m.type || "stdio";
     showForm(
-      " <h2>" + esc(t("form.mcp")) + "</h2>" +
-        field("name", t("field.name"), id) +
-        field("type", t("field.transport"), m.type || "stdio", "select", {
-          options: ["stdio", "http", "sse"],
-          hint: t("hint.transport"),
-        }) +
-        field("command", t("field.command"), m.command) +
-        field("args", t("field.args"), (m.args || []).join("\n"), "textarea") +
-        field("env", t("field.envKv"), kvText(m.env), "textarea") +
-        field("url", t("field.url"), m.url) +
-        field("headers", t("field.headers"), kvText(m.headers), "textarea") +
-        field("timeout", t("field.timeout"), m.timeout || "") +
-        field("disabled", t("field.disabled"), m.disabled, "checkbox") +
-        field("disabled_tools", t("field.disabledTools"), (m.disabled_tools || []).join("\n"), "textarea") +
-        field("enabled_tools", t("field.enabledTools"), (m.enabled_tools || []).join("\n"), "textarea") +
-        field("oauth", t("field.oauth"), m.oauth, "checkbox") +
-        field("oauth_client_id", t("field.oauthClientId"), m.oauth_client_id) +
-        field("oauth_client_secret", t("field.oauthClientSecret"), m.oauth_client_secret) +
-        field("oauth_callback_port", t("field.oauthCallbackPort"), m.oauth_callback_port || "") +
+      formSection(
+        "form.section.identity",
+        field("name", t("field.name"), id, "text", { required: true, spellcheck: false, autocomplete: "off" }) +
+          field("type", t("field.transport"), transport, "select", {
+            options: ["stdio", "http", "sse"],
+            hint: t("hint.transport"),
+          }) +
+          field("disabled", t("field.disabled"), m.disabled, "checkbox") +
+          field("timeout", t("field.timeout"), m.timeout || "", "number"),
+      ) +
+        formSection(
+          "form.section.command",
+          field("command", t("field.command"), m.command, "text", { spellcheck: false }) +
+            field("args", t("field.args"), (m.args || []).join("\n"), "textarea", { spellcheck: false }) +
+            field("env", t("field.envKv"), kvText(m.env), "textarea", { spellcheck: false }),
+          { id: "mcp-stdio", hidden: transport !== "stdio" },
+        ) +
+        formSection(
+          "form.section.http",
+          field("url", t("field.url"), m.url, "text", { spellcheck: false }) +
+            field("headers", t("field.headers"), kvText(m.headers), "textarea", { spellcheck: false }),
+          { id: "mcp-http", hidden: transport === "stdio" },
+        ) +
+        formSection(
+          "form.section.tools",
+          field("disabled_tools", t("field.disabledTools"), (m.disabled_tools || []).join("\n"), "textarea", { spellcheck: false }) +
+            field("enabled_tools", t("field.enabledTools"), (m.enabled_tools || []).join("\n"), "textarea", { spellcheck: false }),
+        ) +
+        formSection(
+          "form.section.auth",
+          field("oauth", t("field.oauth"), m.oauth, "checkbox") +
+            '<div id="mcp-oauth-fields"' +
+            (m.oauth ? "" : " hidden") +
+            ">" +
+            field("oauth_client_id", t("field.oauthClientId"), m.oauth_client_id, "text", { spellcheck: false }) +
+            field("oauth_client_secret", t("field.oauthClientSecret"), m.oauth_client_secret, "secret") +
+            field("oauth_callback_port", t("field.oauthCallbackPort"), m.oauth_callback_port || "", "number") +
+            "</div>",
+        ) +
         formButtons(true, true, m.disabled),
       modalTitleText("form.mcpNew", "form.mcp"),
     );
+    var typeBox = document.querySelector('#form .cselect[data-name="type"]');
+    if (typeBox) typeBox.onchangeBound = syncMcpTransport;
+    var oauth = $("f-oauth");
+    if (oauth) oauth.addEventListener("change", syncMcpOauth);
+    syncMcpTransport();
+    syncMcpOauth();
     $("form").onsubmit = function (e) {
       e.preventDefault();
+      clearFieldErrors();
       var name = val("name");
+      if (!String(name || "").trim()) {
+        setFieldError("name", t("field.required"));
+        return;
+      }
       var server = {
         type: val("type"),
         command: val("command"),
@@ -1117,23 +1411,44 @@
   }
 
   function openLsp(id) {
-    var l = state.data.document.lsp[id] || {};
+    var l = ((state.data.document.lsp || {})[id]) || {};
     showForm(
-      field("name", t("field.name"), id) +
-        field("command", t("field.command"), l.command) +
-        field("args", t("field.args"), (l.args || []).join("\n"), "textarea") +
-        field("env", t("field.envKv"), kvText(l.env), "textarea") +
-        field("filetypes", t("field.filetypes"), (l.filetypes || []).join("\n"), "textarea") +
-        field("root_markers", t("field.rootMarkers"), (l.root_markers || []).join("\n"), "textarea") +
-        field("timeout", t("field.timeout"), l.timeout || "") +
-        field("disabled", t("field.disabled"), l.disabled, "checkbox") +
-        field("init_options", t("field.initOptions"), l.init_options ? JSON.stringify(l.init_options, null, 2) : "", "textarea") +
-        field("options", t("field.optionsJson"), l.options ? JSON.stringify(l.options, null, 2) : "", "textarea") +
+      formSection(
+        "form.section.identity",
+        field("name", t("field.name"), id, "text", { required: true, spellcheck: false }) +
+          field("disabled", t("field.disabled"), l.disabled, "checkbox") +
+          field("timeout", t("field.timeout"), l.timeout || "", "number"),
+      ) +
+        formSection(
+          "form.section.command",
+          field("command", t("field.command"), l.command, "text", { spellcheck: false }) +
+            field("args", t("field.args"), (l.args || []).join("\n"), "textarea", { spellcheck: false }) +
+            field("env", t("field.envKv"), kvText(l.env), "textarea", { spellcheck: false }),
+        ) +
+        formSection(
+          "form.section.lsp",
+          field("filetypes", t("field.filetypes"), (l.filetypes || []).join("\n"), "textarea", { spellcheck: false }) +
+            field("root_markers", t("field.rootMarkers"), (l.root_markers || []).join("\n"), "textarea", { spellcheck: false }),
+        ) +
+        formSection(
+          "form.section.advanced",
+          field("init_options", t("field.initOptions"), l.init_options ? JSON.stringify(l.init_options, null, 2) : "", "textarea", {
+            spellcheck: false,
+          }) +
+            field("options", t("field.optionsJson"), l.options ? JSON.stringify(l.options, null, 2) : "", "textarea", {
+              spellcheck: false,
+            }),
+        ) +
         formButtons(true, true, l.disabled),
       modalTitleText("form.lspNew", "form.lsp"),
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
+      clearFieldErrors();
+      if (!String(val("name") || "").trim()) {
+        setFieldError("name", t("field.required"));
+        return;
+      }
       var inito = val("init_options");
       var opt = val("options");
       var server = {
@@ -1145,8 +1460,18 @@
         timeout: val("timeout") ? Number(val("timeout")) : undefined,
         disabled: val("disabled"),
       };
-      if (inito.trim()) server.init_options = JSON.parse(inito);
-      if (opt.trim()) server.options = JSON.parse(opt);
+      try {
+        if (inito.trim()) server.init_options = JSON.parse(inito);
+      } catch (err) {
+        setFieldError("init_options", t("err.json"));
+        return;
+      }
+      try {
+        if (opt.trim()) server.options = JSON.parse(opt);
+      } catch (err) {
+        setFieldError("options", t("err.json"));
+        return;
+      }
       Promise.resolve(applyOp("upsertLsp", [val("name"), server], true)).then(function () {
         hideForm();
       });
@@ -1170,18 +1495,29 @@
     });
     var h = hooks[0] || { event: event, name: name };
     showForm(
-      field("event", t("field.event"), event, "select", { options: ["PreToolUse"] }) +
-        field("name", t("field.name"), h.name || "") +
-        field("command", t("field.command"), h.command || "") +
-        field("matcher", t("field.matcher"), h.matcher || "") +
-        field("timeout", t("field.timeout"), h.timeout || 30) +
+      formSection(
+        "form.section.identity",
+        field("event", t("field.event"), event, "select", { options: ["PreToolUse"] }) +
+          field("name", t("field.name"), h.name || "", "text", { required: true, spellcheck: false }) +
+          field("timeout", t("field.timeout"), h.timeout || 30, "number"),
+      ) +
+        formSection(
+          "form.section.command",
+          field("command", t("field.command"), h.command || "", "text", { spellcheck: false }) +
+            field("matcher", t("field.matcher"), h.matcher || "", "text", { spellcheck: false }),
+        ) +
         formButtons(true, false),
       "form.hook",
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
+      clearFieldErrors();
       var ev = val("event");
       var nm = val("name");
+      if (!String(nm || "").trim()) {
+        setFieldError("name", t("field.required"));
+        return;
+      }
       var chain = Promise.resolve();
       if (h.name) chain = applyOp("removeHook", [event, h.name], true);
       chain.then(function () {
@@ -1203,12 +1539,15 @@
       return s.name === name;
     })[0]) || { name: name };
     showForm(
-      field("name", t("field.name"), skill.name) +
-        field("description", t("field.description"), skill.description || "", "textarea") +
-        field("source", t("field.source"), skill.source || "") +
-        field("path", t("field.path"), skill.path || "") +
-        field("disabled", t("field.disabled"), skill.disabled, "checkbox") +
-        '<div class="form-actions"><button type="submit" class="primary">' +
+      formSection(
+        "form.section.identity",
+        field("name", t("field.name"), skill.name, "text", { readonly: true }) +
+          field("description", t("field.description"), skill.description || "", "textarea", { readonly: true }) +
+          field("source", t("field.source"), skill.source || "", "text", { readonly: true }) +
+          field("path", t("field.path"), skill.path || "", "text", { readonly: true }) +
+          field("disabled", t("field.disabled"), skill.disabled, "checkbox"),
+      ) +
+        '<div class="form-actions"><span class="spacer"></span><button type="submit" class="primary">' +
         esc(skill.disabled ? t("btn.enable") : t("btn.disable")) +
         "</button></div>",
       "form.skill",
@@ -1225,13 +1564,16 @@
     var kind = id.startsWith("allow:") ? "allow" : "deny";
     var tool = id.slice(kind.length + 1);
     showForm(
-      field("tool", t("field.tool"), tool) +
-        field("kind", t("field.kind"), kind, "select", {
-          options: [
-            { value: "allow", label: t("badge.allow") },
-            { value: "deny", label: t("badge.deny") },
-          ],
-        }) +
+      formSection(
+        "form.section.identity",
+        field("tool", t("field.tool"), tool, "text", { spellcheck: false, readonly: true }) +
+          field("kind", t("field.kind"), kind, "select", {
+            options: [
+              { value: "allow", label: t("badge.allow") },
+              { value: "deny", label: t("badge.deny") },
+            ],
+          }),
+      ) +
         formButtons(true, false),
       "form.permission",
     );
@@ -1250,53 +1592,69 @@
     var tui = o.tui || {};
     var attr = o.attribution || {};
     showForm(
-      '<div class="row">' +
-        field("debug", "debug", o.debug, "checkbox") +
-        field("debug_lsp", "debug-lsp", o.debug_lsp, "checkbox") +
-        "</div>" +
+      formSection(
+        "form.section.behavior",
         '<div class="row">' +
-        field("auto_lsp", "auto-lsp", o.auto_lsp !== false, "checkbox") +
-        field("progress", "progress", o.progress !== false, "checkbox") +
-        "</div>" +
-        '<div class="row">' +
-        field("metrics", "metrics", !o.disable_metrics, "checkbox") +
-        field("auto_summarize", "auto-summarize", !o.disable_auto_summarize, "checkbox") +
-        "</div>" +
-        '<div class="row">' +
-        field("provider_auto_update", "provider-auto-update", !o.disable_provider_auto_update, "checkbox") +
-        field("default_providers", "default-providers", !o.disable_default_providers, "checkbox") +
-        "</div>" +
-        field("data_directory", "data-directory", o.data_directory || "") +
-        field("initialize_as", "initialize-as", o.initialize_as || "AGENTS.md", "select", {
-          options: (function () {
-            var opts = ["AGENTS.md", "CRUSH.md", "CLAUDE.md", "GEMINI.md", "docs/LLMs.md"];
-            if (o.initialize_as && opts.indexOf(o.initialize_as) < 0) opts.unshift(o.initialize_as);
-            return opts;
-          })(),
-        }) +
-        field("notifications", "notifications", o.notifications || "auto", "select", {
-          options: ["auto", "native", "osc", "bell", "disabled"],
-        }) +
-        field("generated_with", "attribution-generated-with", attr.generated_with !== false, "checkbox") +
-        field("trailer", "attribution-trailer-style", attr.trailer_style || "assisted-by", "select", {
-          options: ["none", "co-authored-by", "assisted-by"],
-        }) +
-        field("context_paths", t("field.contextPaths"), (o.context_paths || []).join("\n"), "textarea") +
-        field("global_context_paths", t("field.globalContextPaths"), (o.global_context_paths || []).join("\n"), "textarea") +
-        field("skills_paths", t("field.skillPaths"), (o.skills_paths || []).join("\n"), "textarea") +
-        field("disabled_skills", t("field.disableSkill"), (o.disabled_skills || []).join("\n"), "textarea") +
-        "<h2>" + esc(t("form.optionUi")) + "</h2>" +
-        '<div class="row">' +
-        field("compact", "compact", tui.compact_mode, "checkbox") +
-        field("transparent", "transparent", tui.transparent, "checkbox") +
-        "</div>" +
-        field("diff", "diff", tui.diff_mode || "unified", "select", { options: ["unified", "split"] }) +
-        field("scrollbar", "scrollbar", tui.scrollbar || "default", "select", { options: ["default", "always", "never"] }) +
-        '<div class="row">' +
-        field("max_depth", "completions-max-depth", (tui.completions && tui.completions.max_depth) || "") +
-        field("max_items", "completions-max-items", (tui.completions && tui.completions.max_items) || "") +
-        "</div>" +
-        '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.apply")) + "</button></div>",
+          field("debug", "debug", o.debug, "checkbox") +
+          field("debug_lsp", "debug-lsp", o.debug_lsp, "checkbox") +
+          "</div>" +
+          '<div class="row">' +
+          field("auto_lsp", "auto-lsp", o.auto_lsp !== false, "checkbox") +
+          field("progress", "progress", o.progress !== false, "checkbox") +
+          "</div>" +
+          '<div class="row">' +
+          field("metrics", "metrics", !o.disable_metrics, "checkbox") +
+          field("auto_summarize", "auto-summarize", !o.disable_auto_summarize, "checkbox") +
+          "</div>" +
+          '<div class="row">' +
+          field("provider_auto_update", "provider-auto-update", !o.disable_provider_auto_update, "checkbox") +
+          field("default_providers", "default-providers", !o.disable_default_providers, "checkbox") +
+          "</div>" +
+          field("data_directory", "data-directory", o.data_directory || "", "text", { spellcheck: false }) +
+          field("initialize_as", "initialize-as", o.initialize_as || "AGENTS.md", "select", {
+            options: (function () {
+              var opts = ["AGENTS.md", "CRUSH.md", "CLAUDE.md", "GEMINI.md", "docs/LLMs.md"];
+              if (o.initialize_as && opts.indexOf(o.initialize_as) < 0) opts.unshift(o.initialize_as);
+              return opts;
+            })(),
+          }) +
+          field("notifications", "notifications", o.notifications || "auto", "select", {
+            options: ["auto", "native", "osc", "bell", "disabled"],
+          }),
+      ) +
+        formSection(
+          "form.section.attribution",
+          field("generated_with", "attribution-generated-with", attr.generated_with !== false, "checkbox") +
+            field("trailer", "attribution-trailer-style", attr.trailer_style || "assisted-by", "select", {
+              options: ["none", "co-authored-by", "assisted-by"],
+            }),
+        ) +
+        formSection(
+          "form.section.paths",
+          field("context_paths", t("field.contextPaths"), (o.context_paths || []).join("\n"), "textarea", { spellcheck: false }) +
+            field("global_context_paths", t("field.globalContextPaths"), (o.global_context_paths || []).join("\n"), "textarea", {
+              spellcheck: false,
+            }) +
+            field("skills_paths", t("field.skillPaths"), (o.skills_paths || []).join("\n"), "textarea", { spellcheck: false }) +
+            field("disabled_skills", t("field.disableSkill"), (o.disabled_skills || []).join("\n"), "textarea", { spellcheck: false }),
+        ) +
+        formSection(
+          "form.optionUi",
+          '<div class="row">' +
+            field("compact", "compact", tui.compact_mode, "checkbox") +
+            field("transparent", "transparent", tui.transparent, "checkbox") +
+            "</div>" +
+            field("diff", "diff", tui.diff_mode || "unified", "select", { options: ["unified", "split"] }) +
+            field("scrollbar", "scrollbar", tui.scrollbar || "default", "select", { options: ["default", "always", "never"] }) +
+            '<div class="row">' +
+            field("max_depth", "completions-max-depth", (tui.completions && tui.completions.max_depth) || "", "number") +
+            field("max_items", "completions-max-items", (tui.completions && tui.completions.max_items) || "", "number") +
+            "</div>",
+        ) +
+        '<div class="form-actions"><span class="spacer"></span><button type="submit" class="primary">' +
+        esc(t("btn.apply")) +
+        "</button></div>",
+      "form.options",
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
@@ -1365,8 +1723,11 @@
   function openEnv(key) {
     var value = state.data.document.env[key] || "";
     showForm(
-      field("key", t("field.key"), key) +
-        field("value", t("field.value"), value) +
+      formSection(
+        "form.section.identity",
+        field("key", t("field.key"), key, "text", { required: true, spellcheck: false, autocomplete: "off" }) +
+          field("value", t("field.value"), value, "text", { spellcheck: false }),
+      ) +
         formButtons(true, false),
       "form.env",
     );
@@ -1384,15 +1745,20 @@
   function openTools() {
     var t = state.data.document.tools || {};
     showForm(
-      '<div class="row">' +
-        field("ls_depth", "ls max_depth", t.ls && t.ls.max_depth) +
-        field("ls_items", "ls max_items", t.ls && t.ls.max_items) +
-        "</div>" +
+      formSection(
+        "form.section.tools",
         '<div class="row">' +
-        field("grep_timeout", "grep timeout", t.grep && t.grep.timeout) +
-        field("glob_timeout", "glob timeout", t.glob && t.glob.timeout) +
-        "</div>" +
-        '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.apply")) + "</button></div>",
+          field("ls_depth", "ls max_depth", t.ls && t.ls.max_depth, "number") +
+          field("ls_items", "ls max_items", t.ls && t.ls.max_items, "number") +
+          "</div>" +
+          '<div class="row">' +
+          field("grep_timeout", "grep timeout", t.grep && t.grep.timeout, "number") +
+          field("glob_timeout", "glob timeout", t.glob && t.glob.timeout, "number") +
+          "</div>",
+      ) +
+        '<div class="form-actions"><span class="spacer"></span><button type="submit" class="primary">' +
+        esc(t("btn.apply")) +
+        "</button></div>",
       "form.tools",
     );
     $("form").onsubmit = function (e) {
@@ -1646,30 +2012,50 @@
       };
     } else if (state.section === "skills") {
       showForm(
-        field("path", t("field.directory"), "") +
-          '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.addPath")) + "</button></div>",
+        formSection(
+          "form.section.paths",
+          field("path", t("field.directory"), "", "text", { required: true, spellcheck: false }),
+        ) +
+          '<div class="form-actions"><span class="spacer"></span><button type="submit" class="primary">' +
+          esc(t("btn.addPath")) +
+          "</button></div>",
         "form.skillPath",
       );
       $("form").onsubmit = function (e) {
         e.preventDefault();
+        clearFieldErrors();
+        if (!String(val("path") || "").trim()) {
+          setFieldError("path", t("field.required"));
+          return;
+        }
         Promise.resolve(applyOp("addSkillPath", [val("path")], true)).then(function () {
           hideForm();
         });
       };
     } else if (state.section === "permissions") {
       showForm(
-        field("tool", t("field.tool"), "") +
-          field("kind", t("field.kind"), "allow", "select", {
-            options: [
-              { value: "allow", label: t("badge.allow") },
-              { value: "deny", label: t("badge.deny") },
-            ],
-          }) +
-          '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.add")) + "</button></div>",
+        formSection(
+          "form.section.identity",
+          field("tool", t("field.tool"), "", "text", { required: true, spellcheck: false }) +
+            field("kind", t("field.kind"), "allow", "select", {
+              options: [
+                { value: "allow", label: t("badge.allow") },
+                { value: "deny", label: t("badge.deny") },
+              ],
+            }),
+        ) +
+          '<div class="form-actions"><span class="spacer"></span><button type="submit" class="primary">' +
+          esc(t("btn.add")) +
+          "</button></div>",
         "form.permissionNew",
       );
       $("form").onsubmit = function (e) {
         e.preventDefault();
+        clearFieldErrors();
+        if (!String(val("tool") || "").trim()) {
+          setFieldError("tool", t("field.required"));
+          return;
+        }
         var op = val("kind") === "allow" ? "allowTool" : "denyTool";
         Promise.resolve(applyOp(op, [val("tool")], true)).then(function () {
           hideForm();
@@ -1677,13 +2063,23 @@
       };
     } else if (state.section === "env") {
       showForm(
-        field("key", t("field.key"), "") +
-          field("value", t("field.value"), "") +
-          '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.add")) + "</button></div>",
+        formSection(
+          "form.section.identity",
+          field("key", t("field.key"), "", "text", { required: true, spellcheck: false, autocomplete: "off" }) +
+            field("value", t("field.value"), "", "text", { spellcheck: false }),
+        ) +
+          '<div class="form-actions"><span class="spacer"></span><button type="submit" class="primary">' +
+          esc(t("btn.add")) +
+          "</button></div>",
         "form.envNew",
       );
       $("form").onsubmit = function (e) {
         e.preventDefault();
+        clearFieldErrors();
+        if (!String(val("key") || "").trim()) {
+          setFieldError("key", t("field.required"));
+          return;
+        }
         Promise.resolve(applyOp("setEnv", [val("key"), val("value")], true)).then(function () {
           hideForm();
         });
@@ -1718,7 +2114,9 @@
       if (e.target === $("modalOverlay")) hideForm();
     });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && state.modalOpen) hideForm();
+      if (e.key !== "Escape" || !state.modalOpen) return;
+      if (document.querySelector(".cselect.open")) return;
+      hideForm();
     });
     $("saveBtn").addEventListener("click", doSave);
     $("reloadBtn").addEventListener("click", function () {

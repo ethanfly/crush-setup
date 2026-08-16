@@ -17,6 +17,9 @@ app.setName("Crush Setup");
 if (process.platform === "win32") {
   app.setAppUserModelId("land.crush.setup");
 }
+if (process.platform === "darwin" && app.dock) {
+  app.dock.setIcon(path.join(__dirname, "..", "assets", "icon.png"));
+}
 
 if (extra.includes("--self-check")) {
   const fs = require("node:fs");

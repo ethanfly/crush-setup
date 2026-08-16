@@ -35,6 +35,7 @@ app.whenReady().then(async () => {
     height: 840,
     show: false,
     backgroundColor: "#201f26",
+    icon: path.join(__dirname, "..", "assets", process.platform === "win32" ? "icon.ico" : "icon.png"),
     frame: false,
     titleBarStyle: "hidden",
     webPreferences: {
