@@ -34,7 +34,7 @@ app.whenReady().then(async () => {
     width: 1280,
     height: 840,
     show: false,
-    backgroundColor: "#1c1917",
+    backgroundColor: "#201f26",
     frame: false,
     titleBarStyle: "hidden",
     webPreferences: {

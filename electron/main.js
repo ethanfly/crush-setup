@@ -59,7 +59,7 @@ if (extra.includes("--self-check")) {
         height: 840,
         minWidth: 960,
         minHeight: 640,
-        backgroundColor: "#1c1917",
+        backgroundColor: "#201f26",
         title: "Crush Setup",
         icon: ICON,
         frame: false,

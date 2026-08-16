@@ -49,6 +49,7 @@
     discovered: {},
     editingModel: null,
     crush: null,
+    modalOpen: false,
   };
 
   function $(id) {
@@ -406,6 +407,7 @@
     var list = $("list");
     list.innerHTML = "";
     renderSidebarSlots();
+    renderCrushAgent();
 
     if (!state.data || !state.data.document) {
       list.innerHTML = '<div class="empty">' + esc(t("empty.load")) + "</div>";
@@ -583,17 +585,14 @@
   }
 
   function renderOptionsSummary(list, doc) {
-    var o = doc.options || {};
     list.insertAdjacentHTML(
       "beforeend",
-      cardHtml("options", t("options.cardTitle"), t("options.cardSub"), "", true),
+      cardHtml("options", t("options.cardTitle"), t("options.cardSub"), "", state.modalOpen && state.selected === "options"),
     );
     bindCards(list, function () {
       openOptions();
     });
-    state.selected = "options";
-    openOptions();
-    void o;
+    void doc;
   }
 
   function renderEnv(list, doc) {
@@ -622,10 +621,16 @@
     });
   }
 
-  function showForm(html) {
-    $("emptyDetail").hidden = true;
+  function modalTitleText(create, edit) {
+    return state.selected ? t(edit) : t(create);
+  }
+
+  function showForm(html, titleKey) {
+    var overlay = $("modalOverlay");
+    $("modalTitle").textContent = titleKey ? t(titleKey) : "";
+    overlay.hidden = false;
+    state.modalOpen = true;
     var form = $("form");
-    form.hidden = false;
     form.innerHTML = html;
     var actions = form.querySelector(".form-actions");
     var body = document.createElement("div");
@@ -635,26 +640,41 @@
     }
     form.insertBefore(body, actions || null);
     bindWidgets(form);
+    var first = form.querySelector("input:not([type=hidden]):not([type=checkbox]), textarea");
+    if (first) {
+      try {
+        first.focus();
+      } catch (err) {
+        /* focus is best-effort */
+      }
+    }
   }
 
   function hideForm() {
-    $("form").hidden = true;
+    var overlay = $("modalOverlay");
+    overlay.hidden = true;
+    state.modalOpen = false;
+    state.selected = null;
+    state.editingModel = null;
     $("form").innerHTML = "";
-    var empty = $("emptyDetail");
-    empty.hidden = false;
-    empty.textContent = t("empty.detail");
+    $("list")
+      .querySelectorAll(".card.selected")
+      .forEach(function (c) {
+        c.classList.remove("selected");
+      });
   }
 
   function formButtons(includeDelete, includeToggle, toggled) {
     var html = '<div class="form-actions">';
-    html += '<button type="submit" class="primary">' + esc(t("btn.apply")) + "</button>";
+    if (includeDelete) html += '<button type="button" class="danger" id="deleteBtn">' + esc(t("btn.delete")) + "</button>";
+    html += '<span class="spacer"></span>';
     if (includeToggle) {
       html +=
         '<button type="button" class="ghost" id="toggleBtn">' +
         esc(toggled ? t("btn.enable") : t("btn.disable")) +
         "</button>";
     }
-    if (includeDelete) html += '<button type="button" class="danger" id="deleteBtn">' + esc(t("btn.delete")) + "</button>";
+    html += '<button type="submit" class="primary">' + esc(t("btn.apply")) + "</button>";
     html += "</div>";
     return html;
   }
@@ -973,28 +993,14 @@
   }
 
   function renderListKeepForm() {
-    var keep = state.selected;
-    var section = state.section;
-    var formWas = !$("form").hidden;
     renderList();
-    state.selected = keep;
-    state.section = section;
-    if (formWas && keep && section === "models") {
-      var list = $("list");
-      if (list) {
-        list.querySelectorAll(".card").forEach(function (c) {
-          c.classList.toggle("selected", c.getAttribute("data-id") === keep);
-        });
-      }
-    }
   }
 
   function openProvider(id) {
     var p = (state.data.document.providers || {})[id] || {};
     state.editingModel = null;
     showForm(
-      "<h2>" + esc(t("form.provider")) + "</h2>" +
-        field("id", t("field.id"), id) +
+      field("id", t("field.id"), id) +
         field("name", t("field.name"), p.name) +
         field("type", t("field.type"), p.type || "openai", "select", { options: PROVIDER_TYPES }) +
         field("base_url", t("field.baseUrl"), p.base_url) +
@@ -1010,6 +1016,7 @@
         "<h2>" + esc(t("form.customModels")) + "</h2>" +
         '<div id="modelEditor"></div>' +
         formButtons(true, true, p.disable),
+      modalTitleText("form.providerNew", "form.provider"),
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
@@ -1017,8 +1024,8 @@
         saveProvider()
           .then(function (pid) {
             if (!pid) return;
-            renderSidebarSlots();
-            renderListKeepForm();
+            state.selected = pid;
+            hideForm();
           })
           .catch(function (err) {
             showStatus(err.message || String(err), "error");
@@ -1061,6 +1068,7 @@
         field("oauth_client_secret", t("field.oauthClientSecret"), m.oauth_client_secret) +
         field("oauth_callback_port", t("field.oauthCallbackPort"), m.oauth_callback_port || "") +
         formButtons(true, true, m.disabled),
+      modalTitleText("form.mcpNew", "form.mcp"),
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
@@ -1081,7 +1089,9 @@
         oauth_client_secret: val("oauth_client_secret"),
         oauth_callback_port: val("oauth_callback_port") ? Number(val("oauth_callback_port")) : undefined,
       };
-      applyOp("upsertMcp", [name, server]);
+      Promise.resolve(applyOp("upsertMcp", [name, server], true)).then(function () {
+        hideForm();
+      });
     };
     wireToggleDelete(
       function () {
@@ -1096,8 +1106,7 @@
   function openLsp(id) {
     var l = state.data.document.lsp[id] || {};
     showForm(
-      "<h2>" + esc(t("form.lsp")) + "</h2>" +
-        field("name", t("field.name"), id) +
+      field("name", t("field.name"), id) +
         field("command", t("field.command"), l.command) +
         field("args", t("field.args"), (l.args || []).join("\n"), "textarea") +
         field("env", t("field.envKv"), kvText(l.env), "textarea") +
@@ -1108,6 +1117,7 @@
         field("init_options", t("field.initOptions"), l.init_options ? JSON.stringify(l.init_options, null, 2) : "", "textarea") +
         field("options", t("field.optionsJson"), l.options ? JSON.stringify(l.options, null, 2) : "", "textarea") +
         formButtons(true, true, l.disabled),
+      modalTitleText("form.lspNew", "form.lsp"),
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
@@ -1124,7 +1134,9 @@
       };
       if (inito.trim()) server.init_options = JSON.parse(inito);
       if (opt.trim()) server.options = JSON.parse(opt);
-      applyOp("upsertLsp", [val("name"), server]);
+      Promise.resolve(applyOp("upsertLsp", [val("name"), server], true)).then(function () {
+        hideForm();
+      });
     };
     wireToggleDelete(
       function () {
@@ -1145,25 +1157,27 @@
     });
     var h = hooks[0] || { event: event, name: name };
     showForm(
-      "<h2>" + esc(t("form.hook")) + "</h2>" +
-        field("event", t("field.event"), event, "select", { options: ["PreToolUse"] }) +
+      field("event", t("field.event"), event, "select", { options: ["PreToolUse"] }) +
         field("name", t("field.name"), h.name || "") +
         field("command", t("field.command"), h.command || "") +
         field("matcher", t("field.matcher"), h.matcher || "") +
         field("timeout", t("field.timeout"), h.timeout || 30) +
         formButtons(true, false),
+      "form.hook",
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
       var ev = val("event");
       var nm = val("name");
       var chain = Promise.resolve();
-      if (h.name) chain = applyOp("removeHook", [event, h.name]);
+      if (h.name) chain = applyOp("removeHook", [event, h.name], true);
       chain.then(function () {
         return applyOp("addHook", [
           ev,
           { name: nm, command: val("command"), matcher: val("matcher"), timeout: Number(val("timeout") || 30) },
-        ]);
+        ], true);
+      }).then(function () {
+        hideForm();
       });
     };
     wireToggleDelete(null, function () {
@@ -1176,8 +1190,7 @@
       return s.name === name;
     })[0]) || { name: name };
     showForm(
-      "<h2>" + esc(t("form.skill")) + "</h2>" +
-        field("name", t("field.name"), skill.name) +
+      field("name", t("field.name"), skill.name) +
         field("description", t("field.description"), skill.description || "", "textarea") +
         field("source", t("field.source"), skill.source || "") +
         field("path", t("field.path"), skill.path || "") +
@@ -1185,10 +1198,13 @@
         '<div class="form-actions"><button type="submit" class="primary">' +
         esc(skill.disabled ? t("btn.enable") : t("btn.disable")) +
         "</button></div>",
+      "form.skill",
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
-      applyOp("setSkillDisabled", [skill.name, !skill.disabled]);
+      Promise.resolve(applyOp("setSkillDisabled", [skill.name, !skill.disabled], true)).then(function () {
+        hideForm();
+      });
     };
   }
 
@@ -1196,8 +1212,7 @@
     var kind = id.startsWith("allow:") ? "allow" : "deny";
     var tool = id.slice(kind.length + 1);
     showForm(
-      "<h2>" + esc(t("form.permission")) + "</h2>" +
-        field("tool", t("field.tool"), tool) +
+      field("tool", t("field.tool"), tool) +
         field("kind", t("field.kind"), kind, "select", {
           options: [
             { value: "allow", label: t("badge.allow") },
@@ -1205,6 +1220,7 @@
           ],
         }) +
         formButtons(true, false),
+      "form.permission",
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
@@ -1221,8 +1237,7 @@
     var tui = o.tui || {};
     var attr = o.attribution || {};
     showForm(
-      "<h2>" + esc(t("form.options")) + "</h2>" +
-        '<div class="row">' +
+      '<div class="row">' +
         field("debug", "debug", o.debug, "checkbox") +
         field("debug_lsp", "debug-lsp", o.debug_lsp, "checkbox") +
         "</div>" +
@@ -1328,6 +1343,8 @@
       if (val("max_items") !== "") setUi("completions-max-items", Number(val("max_items")));
       chain.then(function () {
         return refresh();
+      }).then(function () {
+        hideForm();
       });
     };
   }
@@ -1335,14 +1352,16 @@
   function openEnv(key) {
     var value = state.data.document.env[key] || "";
     showForm(
-      "<h2>" + esc(t("form.env")) + "</h2>" +
-        field("key", t("field.key"), key) +
+      field("key", t("field.key"), key) +
         field("value", t("field.value"), value) +
         formButtons(true, false),
+      "form.env",
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
-      applyOp("setEnv", [val("key"), val("value")]);
+      Promise.resolve(applyOp("setEnv", [val("key"), val("value")], true)).then(function () {
+        hideForm();
+      });
     };
     wireToggleDelete(null, function () {
       return applyOp("removeEnv", [key]);
@@ -1352,8 +1371,7 @@
   function openTools() {
     var t = state.data.document.tools || {};
     showForm(
-      "<h2>" + esc(t("form.tools")) + "</h2>" +
-        '<div class="row">' +
+      '<div class="row">' +
         field("ls_depth", "ls max_depth", t.ls && t.ls.max_depth) +
         field("ls_items", "ls max_items", t.ls && t.ls.max_items) +
         "</div>" +
@@ -1362,16 +1380,21 @@
         field("glob_timeout", "glob timeout", t.glob && t.glob.timeout) +
         "</div>" +
         '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.apply")) + "</button></div>",
+      "form.tools",
     );
     $("form").onsubmit = function (e) {
       e.preventDefault();
-      applyOp("setTools", [
-        {
-          ls: { max_depth: Number(val("ls_depth") || 0), max_items: Number(val("ls_items") || 0) },
-          grep: { timeout: Number(val("grep_timeout") || 0) },
-          glob: { timeout: Number(val("glob_timeout") || 0) },
-        },
-      ]);
+      Promise.resolve(
+        applyOp("setTools", [
+          {
+            ls: { max_depth: Number(val("ls_depth") || 0), max_items: Number(val("ls_items") || 0) },
+            grep: { timeout: Number(val("grep_timeout") || 0) },
+            glob: { timeout: Number(val("glob_timeout") || 0) },
+          },
+        ], true),
+      ).then(function () {
+        hideForm();
+      });
     };
   }
 
@@ -1595,29 +1618,34 @@
       state.selected = "";
       openLsp("");
     } else if (state.section === "hooks") {
-      state.selected = "PreToolUse::";
+      state.selected = "";
       openHook("PreToolUse::");
       $("form").onsubmit = function (e) {
         e.preventDefault();
-        applyOp("addHook", [
-          val("event"),
-          { name: val("name"), command: val("command"), matcher: val("matcher"), timeout: Number(val("timeout") || 30) },
-        ]);
+        Promise.resolve(
+          applyOp("addHook", [
+            val("event"),
+            { name: val("name"), command: val("command"), matcher: val("matcher"), timeout: Number(val("timeout") || 30) },
+          ], true),
+        ).then(function () {
+          hideForm();
+        });
       };
     } else if (state.section === "skills") {
       showForm(
-        "<h2>" + esc(t("form.skillPath")) + "</h2>" +
-          field("path", t("field.directory"), "") +
+        field("path", t("field.directory"), "") +
           '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.addPath")) + "</button></div>",
+        "form.skillPath",
       );
       $("form").onsubmit = function (e) {
         e.preventDefault();
-        applyOp("addSkillPath", [val("path")]);
+        Promise.resolve(applyOp("addSkillPath", [val("path")], true)).then(function () {
+          hideForm();
+        });
       };
     } else if (state.section === "permissions") {
       showForm(
-        "<h2>" + esc(t("form.permission")) + "</h2>" +
-          field("tool", t("field.tool"), "") +
+        field("tool", t("field.tool"), "") +
           field("kind", t("field.kind"), "allow", "select", {
             options: [
               { value: "allow", label: t("badge.allow") },
@@ -1625,22 +1653,27 @@
             ],
           }) +
           '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.add")) + "</button></div>",
+        "form.permissionNew",
       );
       $("form").onsubmit = function (e) {
         e.preventDefault();
-        if (val("kind") === "allow") applyOp("allowTool", [val("tool")]);
-        else applyOp("denyTool", [val("tool")]);
+        var op = val("kind") === "allow" ? "allowTool" : "denyTool";
+        Promise.resolve(applyOp(op, [val("tool")], true)).then(function () {
+          hideForm();
+        });
       };
     } else if (state.section === "env") {
       showForm(
-        "<h2>" + esc(t("form.env")) + "</h2>" +
-          field("key", t("field.key"), "") +
+        field("key", t("field.key"), "") +
           field("value", t("field.value"), "") +
           '<div class="form-actions"><button type="submit" class="primary">' + esc(t("btn.add")) + "</button></div>",
+        "form.envNew",
       );
       $("form").onsubmit = function (e) {
         e.preventDefault();
-        applyOp("setEnv", [val("key"), val("value")]);
+        Promise.resolve(applyOp("setEnv", [val("key"), val("value")], true)).then(function () {
+          hideForm();
+        });
       };
     }
   }
@@ -1667,6 +1700,13 @@
       });
     });
     $("addBtn").addEventListener("click", onAdd);
+    $("modalClose").addEventListener("click", hideForm);
+    $("modalOverlay").addEventListener("mousedown", function (e) {
+      if (e.target === $("modalOverlay")) hideForm();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && state.modalOpen) hideForm();
+    });
     $("saveBtn").addEventListener("click", doSave);
     $("reloadBtn").addEventListener("click", function () {
       if (!api) return doLoad();
@@ -1712,18 +1752,17 @@
     showFileHint();
     renderCrushAgent();
     renderList();
-    if (state.selected && state.data && state.data.document) {
-      if (state.section === "models") openProvider(state.selected);
-      else if (state.section === "mcp") openMcp(state.selected);
-      else if (state.section === "lsp") openLsp(state.selected);
-      else if (state.section === "hooks") openHook(state.selected);
-      else if (state.section === "skills") openSkill(state.selected);
-      else if (state.section === "permissions") openPermission(state.selected);
-      else if (state.section === "options") openOptions();
-      else if (state.section === "env") {
-        if (state.selected === "tools") openTools();
-        else if (state.selected.indexOf("env:") === 0) openEnv(state.selected.slice(4));
-      }
+    if (!state.modalOpen || !state.selected || !state.data || !state.data.document) return;
+    if (state.section === "models") openProvider(state.selected);
+    else if (state.section === "mcp") openMcp(state.selected);
+    else if (state.section === "lsp") openLsp(state.selected);
+    else if (state.section === "hooks") openHook(state.selected);
+    else if (state.section === "skills") openSkill(state.selected);
+    else if (state.section === "permissions") openPermission(state.selected);
+    else if (state.section === "options") openOptions();
+    else if (state.section === "env") {
+      if (state.selected === "tools") openTools();
+      else if (state.selected.indexOf("env:") === 0) openEnv(state.selected.slice(4));
     }
   }
 

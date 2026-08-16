@@ -90,14 +90,23 @@
               </div>
               <div id="list" class="card-list"></div>
             </div>
-            <div class="detail-pane">
-              <form id="form" class="form" hidden></form>
-              <div id="emptyDetail" class="empty" data-i18n="empty.detail">Select an item or click Add.</div>
-            </div>
           </section>
         </main>
       </div>
     </div>
+
+    <div id="modalOverlay" class="modal-overlay" hidden>
+      <div class="modal" role="dialog" aria-modal="true">
+        <header class="modal-head">
+          <h2 id="modalTitle"></h2>
+          <button type="button" id="modalClose" class="modal-close" data-i18n-aria="btn.close" aria-label="Close">
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3L3 9" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+          </button>
+        </header>
+        <form id="form" class="form"></form>
+      </div>
+    </div>
+
     <script src="i18n.js"></script>
     <script src="app.js"></script>
   </body>

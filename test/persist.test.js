@@ -558,6 +558,7 @@ describe("crush-setup persist", () => {
         getElementById() {
           return el();
         },
+        addEventListener() {},
         querySelectorAll() {
           return [fake];
         },
@@ -627,7 +628,7 @@ describe("crush-setup persist", () => {
     assert.match(css, /--charple/);
     assert.match(css, /--dolly/);
     assert.match(css, /--butter/);
-    assert.match(css, /#1c1917/);
+    assert.match(css, /#201f26/);
     assert.doesNotMatch(js, /\brequire\s*\(/);
     assert.doesNotMatch(js, /\bmodule\.exports\b/);
     assert.match(js, /file:/);
