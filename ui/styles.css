@@ -180,6 +180,8 @@ body::before {
   flex-direction: column;
   padding: 16px 10px 12px;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .brand {
@@ -253,7 +255,7 @@ html[lang="en"] .brand-sub { text-transform: lowercase; }
   display: flex;
   flex-direction: column;
   gap: 3px;
-  overflow: auto;
+  flex-shrink: 0;
 }
 
 .nav-item {
@@ -333,12 +335,16 @@ html[lang="en"] .nav-slots-title { text-transform: uppercase; }
 }
 
 .nav-slot .cselect-menu {
-  left: 0;
+  position: fixed;
+  left: 10px;
   right: auto;
-  min-width: 100%;
+  top: auto;
+  bottom: auto;
+  min-width: 200px;
   width: max-content;
-  max-width: 280px;
-  z-index: 50;
+  max-width: 300px;
+  max-height: 220px;
+  z-index: 200;
 }
 
 .crush-agent {

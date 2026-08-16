@@ -320,7 +320,20 @@
           }
         });
         box.classList.add("open");
-        if (menu) menu.hidden = false;
+        if (menu) {
+          menu.hidden = false;
+          if (box.closest(".nav-slot") && btn && btn.getBoundingClientRect) {
+            var rect = btn.getBoundingClientRect();
+            var menuH = Math.min(menu.scrollHeight || 200, 220);
+            var spaceBelow = window.innerHeight - rect.bottom;
+            menu.style.left = Math.max(8, rect.left) + "px";
+            if (spaceBelow < menuH + 12 && rect.top > menuH + 12) {
+              menu.style.top = rect.top - menuH - 4 + "px";
+            } else {
+              menu.style.top = rect.bottom + 4 + "px";
+            }
+          }
+        }
       }
       if (btn) {
         btn.addEventListener("click", function (e) {
