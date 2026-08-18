@@ -739,6 +739,123 @@ button.danger:focus-visible {
   gap: 12px;
 }
 
+.think-panel {
+  grid-column: 1 / -1;
+  background: var(--bbq);
+  border: var(--border) solid var(--charple);
+  padding: 14px;
+  box-shadow: var(--px) var(--px) 0 var(--ink);
+  position: relative;
+}
+
+.think-panel::before,
+.think-panel::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: var(--dolly);
+  pointer-events: none;
+}
+
+.think-panel::before { top: -2px; left: -2px; }
+.think-panel::after { top: -2px; right: -2px; }
+
+.think-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.think-panel-head h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--salt);
+  font-family: var(--display);
+  letter-spacing: 0.03em;
+}
+
+.think-panel-head p {
+  margin: 0;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.think-panel-head .primary { flex-shrink: 0; }
+
+.think-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.think-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.think-slot {
+  background: var(--pepper);
+  border: var(--border) solid var(--char);
+  padding: 10px;
+}
+
+.think-slot.is-empty { opacity: 0.62; }
+
+.think-slot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.think-slot-name {
+  font-size: 11px;
+  color: var(--bok);
+  letter-spacing: 0.06em;
+}
+
+.think-slot-ref {
+  font-size: 12px;
+  color: var(--sash);
+  word-break: break-all;
+}
+
+.think-slot-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.think-slot-controls .hint { display: none; }
+
+.think-slot-controls .field { margin: 0; }
+
+.cselect.is-disabled {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.nav-slot-think {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--bok);
+  letter-spacing: 0.04em;
+}
+
+.nav-slot-think.is-off { color: var(--oyster); }
+
+.nav-max-think {
+  width: 100%;
+  margin-top: 6px;
+}
+
 .card {
   background: var(--bbq);
   border: var(--border) solid var(--char);
@@ -1417,6 +1534,8 @@ textarea {
   .titlebar-name { display: none; }
   .modal { width: 100%; }
   .row { grid-template-columns: 1fr; }
+  .think-slots,
+  .think-slot-controls { grid-template-columns: 1fr; }
   .topbar { flex-wrap: wrap; }
 }
 

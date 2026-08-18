@@ -229,6 +229,137 @@ describe("crush-setup persist", () => {
     assert.equal(session.document.models.small.max_tokens, 256);
   });
 
+  it("sets max reasoning on assigned slots and keeps other slot fields", () => {
+    let session = loadIn(box);
+    session = persistApi.apply(session, "upsertProvider", [
+      { id: "slotp", type: "openai", name: "Slot" },
+    ]);
+    session = persistApi.apply(session, "upsertModel", [
+      "slotp",
+      { id: "big", name: "Big", can_reason: true, default_reasoning_effort: "low" },
+    ]);
+    session = persistApi.apply(session, "upsertModel", ["slotp", { id: "tiny", name: "Tiny" }]);
+    session = persistApi.apply(session, "setModelSlot", [
+      "large",
+      { provider: "slotp", model: "big", max_tokens: 1024, temperature: 0.2 },
+    ]);
+    session = persistApi.apply(session, "setMaxReasoning", [
+      {
+        large: session.document.models.large,
+        small: { provider: "slotp", model: "tiny" },
+      },
+    ]);
+    persistApi.save(session);
+    session = persistApi.reload(session);
+    assert.equal(session.document.models.large.think, true);
+    assert.equal(session.document.models.large.reasoning_effort, persistApi.MAX_REASONING_EFFORT);
+    assert.equal(session.document.models.large.max_tokens, 1024);
+    assert.equal(session.document.models.large.temperature, 0.2);
+    assert.equal(session.document.models.small.think, true);
+    assert.equal(session.document.models.small.reasoning_effort, "high");
+    assert.equal(session.document.models.small.model, "tiny");
+    const rc = persistApi.generateCrushrc(session.overlay);
+    assert.match(rc, /model large .*--think.*--reasoning-effort high/);
+    assert.match(rc, /model small .*--think.*--reasoning-effort high/);
+    assert.equal(session.document.providers.slotp.models.find((m) => m.id === "big").default_reasoning_effort, "low");
+  });
+
+  it("sets max tokens to the catalog context window", () => {
+    let session = loadIn(box);
+    session = persistApi.apply(session, "upsertProvider", [
+      { id: "slotp", type: "openai", name: "Slot" },
+    ]);
+    session = persistApi.apply(session, "upsertModel", [
+      "slotp",
+      { id: "big", name: "Big", context_window: 64000, default_max_tokens: 1024 },
+    ]);
+    session = persistApi.apply(session, "setModelSlot", [
+      "large",
+      { provider: "slotp", model: "big", max_tokens: 512, think: true },
+    ]);
+    session = persistApi.apply(session, "setMaxLimits", [
+      {
+        large: {
+          provider: "slotp",
+          model: "big",
+          max_tokens: 64000,
+          context_window: 64000,
+          think: true,
+        },
+      },
+    ]);
+    persistApi.save(session);
+    session = persistApi.reload(session);
+    assert.equal(session.document.models.large.max_tokens, 64000);
+    assert.equal(session.document.models.large.think, true);
+    assert.equal(session.document.models.large.context_window, undefined);
+    const model = session.document.providers.slotp.models.find((m) => m.id === "big");
+    assert.equal(model.default_max_tokens, 64000);
+    assert.equal(model.context_window, 64000);
+    const rc = persistApi.generateCrushrc(session.overlay);
+    assert.match(rc, /model large .*--max-tokens 64000/);
+    assert.match(rc, /--default-max-tokens 64000/);
+  });
+
+  it("patches catalog context_window without wiping lower-layer fields", () => {
+    const globalDir = path.join(box.xdg, "crush");
+    fs.mkdirSync(globalDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(globalDir, "crush.json"),
+      `${JSON.stringify({
+        $schema: "https://charm.land/crush.json",
+        providers: {
+          slotp: {
+            type: "openai",
+            models: [
+              {
+                id: "big",
+                name: "Big",
+                can_reason: true,
+                context_window: 128000,
+                default_max_tokens: 4096,
+              },
+            ],
+          },
+        },
+      })}\n`,
+    );
+    let session = loadIn(box, { writeScope: "project" });
+    session = persistApi.apply(session, "patchModel", ["slotp", "big", { context_window: 256000 }]);
+    persistApi.save(session);
+    session = persistApi.reload(session);
+    const model = session.document.providers.slotp.models.find((m) => m.id === "big");
+    assert.ok(model);
+    assert.equal(model.context_window, 256000);
+    assert.equal(model.can_reason, true);
+    assert.equal(model.name, "Big");
+    assert.equal(model.default_max_tokens, 4096);
+  });
+
+  it("refuses setMaxReasoning when no slots are assigned", () => {
+    const session = loadIn(box);
+    assert.throws(
+      () => persistApi.apply(session, "setMaxReasoning", []),
+      /no model slots to set/,
+    );
+  });
+
+  it("stores default_reasoning_effort on a catalog model", () => {
+    let session = loadIn(box);
+    session = persistApi.apply(session, "upsertProvider", [
+      { id: "slotp", type: "openai", name: "Slot" },
+    ]);
+    session = persistApi.apply(session, "upsertModel", [
+      "slotp",
+      { id: "thinker", name: "Thinker", can_reason: true, default_reasoning_effort: "medium" },
+    ]);
+    persistApi.save(session);
+    session = persistApi.reload(session);
+    const model = session.document.providers.slotp.models.find((m) => m.id === "thinker");
+    assert.equal(model.default_reasoning_effort, "medium");
+    assert.equal(model.can_reason, true);
+  });
+
   it("discovers two SKILL.md dirs and toggles disable-skill", () => {
     const skillA = path.join(box.project, ".agents", "skills", "alpha-skill");
     const skillB = path.join(box.project, "custom-skills", "beta-skill");
@@ -647,6 +778,10 @@ describe("crush-setup persist", () => {
     assert.match(js, /cselect/);
     assert.match(js, /fetchModelsBtn/);
     assert.match(js, /addModelBtn/);
+    assert.match(js, /setMaxReasoning/);
+    assert.match(js, /setMaxLimits/);
+    assert.match(html, /id="maxThinkNavBtn"/);
+    assert.match(html, /id="maxLimitsNavBtn"/);
     assert.match(js, /discoverModels/);
     assert.match(css, /::-webkit-scrollbar/);
     assert.match(js, /setProviderDisabled|setMcpDisabled|setLspDisabled|setSkillDisabled/);

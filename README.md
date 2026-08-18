@@ -46,6 +46,8 @@ Manages Crush **providers & models, skills, MCP, LSP, hooks, permissions, option
 - 全局 / 项目两套作用域，读写 Crush 会加载的 `crush.json` / `crushrc`
 - 供应商与模型：手动添加、拉取 `/models` 列表、编辑、删除
 - 左侧固定大模型 / 小模型槽位（`model large` / `model small`）
+- 模型思考 / 推理等级（`--think`、`--reasoning-effort`），可一键设为最大强度
+- 上下文窗口与最大 token，可一键拉到该模型的完整上下文
 - 技能发现与 `disable-skill`
 - MCP（stdio / http / sse）、LSP、钩子、权限 allow/deny
 - 选项与 option ui、`env`、`tools`

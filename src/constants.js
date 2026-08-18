@@ -35,6 +35,12 @@ const SCROLLBAR_MODES = ["default", "always", "never"];
 
 const REASONING_EFFORTS = ["low", "medium", "high"];
 
+/** Highest Crush-documented reasoning effort (`model … --reasoning-effort`). */
+const MAX_REASONING_EFFORT = "high";
+
+/** Crush `defaultModel()` fallback when a catalog model omits context_window. */
+const DEFAULT_CONTEXT_WINDOW = 128000;
+
 const PROJECT_CONFIG_NAMES = [".crushrc", "crushrc", ".crush.json", "crush.json"];
 
 /** Merge order within one directory: later wins. */
@@ -91,6 +97,8 @@ module.exports = {
   DIFF_MODES,
   SCROLLBAR_MODES,
   REASONING_EFFORTS,
+  MAX_REASONING_EFFORT,
+  DEFAULT_CONTEXT_WINDOW,
   PROJECT_CONFIG_NAMES,
   PROJECT_MERGE_ORDER,
   PROJECT_SKILL_SUBDIRS,

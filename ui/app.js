@@ -21,6 +21,9 @@
     return key;
   }
 
+  var REASONING_EFFORTS = ["low", "medium", "high"];
+  var DEFAULT_CONTEXT_WINDOW = 128000;
+
   var PROVIDER_TYPES = [
     "openai",
     "openai-compat",
@@ -672,6 +675,274 @@
     return { provider: ref.slice(0, cut), model: ref.slice(cut + 1) };
   }
 
+  function effortOptions(includeOff) {
+    var items = [];
+    if (includeOff) items.push({ value: "", label: t("effort.off") });
+    REASONING_EFFORTS.forEach(function (e) {
+      items.push({ value: e, label: t("effort." + e) });
+    });
+    return items;
+  }
+
+  function slotRecord(slot) {
+    var models = state.data && state.data.document && state.data.document.models;
+    return (models && models[slot]) || {};
+  }
+
+  function cleanSlotPayload(sel, extra) {
+    var payload = Object.assign({}, sel || {}, extra || {});
+    if (!payload.provider || !payload.model) return null;
+    if (!payload.think) delete payload.think;
+    if (!payload.reasoning_effort) delete payload.reasoning_effort;
+    delete payload.context_window;
+    if (extra && Object.prototype.hasOwnProperty.call(extra, "max_tokens")) {
+      var n = Number(extra.max_tokens);
+      if (!isFinite(n) || n <= 0) delete payload.max_tokens;
+      else payload.max_tokens = Math.floor(n);
+    }
+    return payload;
+  }
+
+  function catalogModel(providerId, modelId) {
+    var providers = state.data && state.data.document && state.data.document.providers;
+    var p = providers && providers[providerId];
+    var list = (p && p.models) || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === modelId) return list[i];
+    }
+    return null;
+  }
+
+  function slotLimits(slot) {
+    var sel = slotRecord(slot);
+    var cat = sel.provider ? catalogModel(sel.provider, sel.model) : null;
+    var ctx = cat && cat.context_window != null ? Number(cat.context_window) : 0;
+    var slotMax = sel.max_tokens != null && sel.max_tokens !== "" ? Number(sel.max_tokens) : 0;
+    var defMax = cat && cat.default_max_tokens != null ? Number(cat.default_max_tokens) : 0;
+    return {
+      sel: sel,
+      cat: cat,
+      contextWindow: ctx > 0 ? ctx : 0,
+      maxTokens: slotMax > 0 ? slotMax : defMax > 0 ? defMax : 0,
+      maxAvailable: ctx > 0 ? ctx : DEFAULT_CONTEXT_WINDOW,
+    };
+  }
+
+  function formatTok(n) {
+    n = Number(n);
+    if (!isFinite(n) || n <= 0) return "";
+    if (n >= 1000000 && n % 1000000 === 0) return n / 1000000 + "M";
+    if (n >= 1000 && n % 1000 === 0) return n / 1000 + "k";
+    return String(n);
+  }
+
+  function applySlotPatch(slot, extra) {
+    var payload = cleanSlotPayload(slotRecord(slot), extra);
+    if (!payload) {
+      showStatus(t("status.maxThinkNone"), "error");
+      return Promise.resolve();
+    }
+    return applyOp("setModelSlot", [slot, payload], true).then(function () {
+      renderList();
+    });
+  }
+
+  function applyMaxThinking() {
+    var selections = {};
+    var large = cleanSlotPayload(slotRecord("large"));
+    var small = cleanSlotPayload(slotRecord("small"));
+    if (large) selections.large = large;
+    if (small) selections.small = small;
+    if (!selections.large && !selections.small) {
+      showStatus(t("status.maxThinkNone"), "error");
+      return Promise.resolve();
+    }
+    return applyOp("setMaxReasoning", [selections], true).then(function (next) {
+      if (!next || !next.document) return;
+      showStatus(t("status.maxThink"), "ok");
+      renderList();
+    });
+  }
+
+  function applyMaxLimits() {
+    var selections = {};
+    ["large", "small"].forEach(function (slot) {
+      var lim = slotLimits(slot);
+      if (!lim.sel.provider || !lim.sel.model) return;
+      var maxTok = lim.maxAvailable;
+      var payload = cleanSlotPayload(lim.sel, { max_tokens: maxTok });
+      if (!payload) return;
+      payload.max_tokens = maxTok;
+      payload.context_window = maxTok;
+      selections[slot] = payload;
+    });
+    if (!selections.large && !selections.small) {
+      showStatus(t("status.maxThinkNone"), "error");
+      return Promise.resolve();
+    }
+    return applyOp("setMaxLimits", [selections], true).then(function (next) {
+      if (!next || !next.document) return;
+      showStatus(t("status.maxLimits"), "ok");
+      renderList();
+    });
+  }
+
+  function applyCatalogNumber(slot, key, raw) {
+    var sel = slotRecord(slot);
+    if (!sel.provider || !sel.model) {
+      showStatus(t("status.maxThinkNone"), "error");
+      return Promise.resolve();
+    }
+    var n = Number(raw);
+    if (!isFinite(n) || n <= 0) {
+      showStatus(t("err.positiveInt"), "error");
+      return Promise.resolve();
+    }
+    var patch = {};
+    patch[key] = Math.floor(n);
+    return applyOp("patchModel", [sel.provider, sel.model, patch], true).then(function () {
+      renderList();
+    });
+  }
+
+  function thinkSummary(sel, slot) {
+    if (!sel || !sel.provider || !sel.model) return "";
+    var on = Boolean(sel.think || sel.reasoning_effort);
+    var label = sel.reasoning_effort
+      ? t("field.think") + " · " + t("effort." + sel.reasoning_effort)
+      : sel.think
+        ? t("field.think")
+        : t("effort.off");
+    var lim = slotLimits(slot);
+    var bits = [];
+    if (lim.contextWindow) bits.push(formatTok(lim.contextWindow));
+    if (lim.maxTokens) bits.push(t("field.slotMaxTokens") + " " + formatTok(lim.maxTokens));
+    return (
+      '<div class="nav-slot-think' +
+      (on ? "" : " is-off") +
+      '" title="' +
+      esc(t("hint.slot_think")) +
+      '">' +
+      esc(label) +
+      "</div>" +
+      (bits.length
+        ? '<div class="nav-slot-think nav-slot-limits" title="' +
+          esc(t("hint.maxLimits")) +
+          '">' +
+          esc(bits.join(" · ")) +
+          "</div>"
+        : "")
+    );
+  }
+
+  function thinkSlotHtml(slot, sel) {
+    var assigned = Boolean(sel && sel.provider && sel.model);
+    var ref = assigned ? slotRef(sel) : "—";
+    var lim = slotLimits(slot);
+    return (
+      '<div class="think-slot' +
+      (assigned ? "" : " is-empty") +
+      '" data-slot="' +
+      slot +
+      '"><div class="think-slot-meta"><span class="think-slot-name">' +
+      esc(t(slot === "small" ? "slot.small" : "slot.large")) +
+      '</span><span class="think-slot-ref">' +
+      esc(ref) +
+      '</span></div><div class="think-slot-controls">' +
+      field("think_" + slot, t("field.think"), Boolean(sel && sel.think), "checkbox") +
+      field("effort_" + slot, t("field.reasoningEffort"), (sel && sel.reasoning_effort) || "", "select", {
+        options: effortOptions(true),
+      }) +
+      field("ctx_" + slot, t("field.contextWindow"), lim.contextWindow || "", "number") +
+      field("maxtok_" + slot, t("field.slotMaxTokens"), lim.maxTokens || "", "number") +
+      "</div></div>"
+    );
+  }
+
+  function thinkPanelHtml(doc) {
+    var models = (doc && doc.models) || {};
+    return (
+      '<div class="think-panel">' +
+      '<div class="think-panel-head"><div><h3>' +
+      esc(t("think.title")) +
+      "</h3><p>" +
+      esc(t("think.cardSub")) +
+      '</p></div><div class="think-panel-actions"><button type="button" class="primary small" id="maxThinkBtn" title="' +
+      esc(t("hint.maxThink")) +
+      '">' +
+      esc(t("btn.maxThink")) +
+      '</button><button type="button" class="primary small" id="maxLimitsBtn" title="' +
+      esc(t("hint.maxLimits")) +
+      '">' +
+      esc(t("btn.maxLimits")) +
+      "</button></div></div><div class=\"think-slots\">" +
+      thinkSlotHtml("large", models.large) +
+      thinkSlotHtml("small", models.small) +
+      "</div></div>"
+    );
+  }
+
+  function bindThinkPanel(root) {
+    var panel = root && root.querySelector ? root.querySelector(".think-panel") : null;
+    if (!panel) return;
+    bindWidgets(panel);
+    var maxBtn = $("maxThinkBtn");
+    if (maxBtn) {
+      maxBtn.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        applyMaxThinking();
+      };
+    }
+    var maxLimitsBtn = $("maxLimitsBtn");
+    if (maxLimitsBtn) {
+      maxLimitsBtn.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        applyMaxLimits();
+      };
+    }
+    ["large", "small"].forEach(function (slot) {
+      var box = panel.querySelector('.think-slot[data-slot="' + slot + '"]');
+      if (!box) return;
+      var empty = box.classList.contains("is-empty");
+      var thinkEl = $("f-think_" + slot);
+      var effortBox = box.querySelector('.cselect[data-name="effort_' + slot + '"]');
+      var ctxEl = $("f-ctx_" + slot);
+      var maxEl = $("f-maxtok_" + slot);
+      if (thinkEl) {
+        thinkEl.disabled = empty;
+        thinkEl.onchange = function () {
+          if (empty) return;
+          applySlotPatch(slot, { think: thinkEl.checked });
+        };
+      }
+      if (effortBox) {
+        if (empty) effortBox.classList.add("is-disabled");
+        effortBox.onchangeBound = function (value) {
+          if (empty) return;
+          var patch = { reasoning_effort: value };
+          if (value) patch.think = true;
+          applySlotPatch(slot, patch);
+        };
+      }
+      if (ctxEl) {
+        ctxEl.disabled = empty;
+        ctxEl.onchange = function () {
+          if (empty) return;
+          applyCatalogNumber(slot, "context_window", ctxEl.value);
+        };
+      }
+      if (maxEl) {
+        maxEl.disabled = empty;
+        maxEl.onchange = function () {
+          if (empty) return;
+          applySlotPatch(slot, { max_tokens: maxEl.value });
+        };
+      }
+    });
+  }
+
   function renderSidebarSlots() {
     var largeEl = $("slotLarge");
     var smallEl = $("slotSmall");
@@ -700,8 +971,8 @@
         customSelectHtml("slot-" + slot, cur, opts)
       );
     }
-    largeEl.innerHTML = slotSelect("large", large);
-    smallEl.innerHTML = slotSelect("small", small);
+    largeEl.innerHTML = slotSelect("large", large) + thinkSummary(large, "large");
+    smallEl.innerHTML = slotSelect("small", small) + thinkSummary(small, "small");
     bindWidgets(largeEl);
     bindWidgets(smallEl);
     function bindSlot(el, slot) {
@@ -710,19 +981,42 @@
       box.onchangeBound = function (ref) {
         var parsed = parseSlotRef(ref);
         if (!parsed) return;
-        applyOp("setModelSlot", [slot, parsed], true).then(function () {
-          renderSidebarSlots();
+        var payload = cleanSlotPayload(slotRecord(slot), parsed);
+        if (!payload) payload = parsed;
+        applyOp("setModelSlot", [slot, payload], true).then(function () {
+          renderList();
         });
       };
     }
     bindSlot(largeEl, "large");
     bindSlot(smallEl, "small");
+    var canMax = Boolean((large && large.provider && large.model) || (small && small.provider && small.model));
+    var maxNav = $("maxThinkNavBtn");
+    if (maxNav) {
+      maxNav.disabled = !canMax;
+      maxNav.title = t("hint.maxThink");
+      maxNav.textContent = t("btn.maxThink");
+      maxNav.onclick = function () {
+        applyMaxThinking();
+      };
+    }
+    var maxLimNav = $("maxLimitsNavBtn");
+    if (maxLimNav) {
+      maxLimNav.disabled = !canMax;
+      maxLimNav.title = t("hint.maxLimits");
+      maxLimNav.textContent = t("btn.maxLimits");
+      maxLimNav.onclick = function () {
+        applyMaxLimits();
+      };
+    }
   }
 
   function renderModels(list, doc) {
+    list.insertAdjacentHTML("beforeend", thinkPanelHtml(doc));
+    bindThinkPanel(list);
     var providers = entries(doc.providers);
     if (!providers.length) {
-      list.innerHTML = emptyHtml(t("empty.detail"));
+      list.insertAdjacentHTML("beforeend", emptyHtml(t("empty.detail")));
       return;
     }
     providers.forEach(function (p) {
@@ -986,7 +1280,16 @@
         field("edit_reason", t("field.canReason"), m.can_reason, "checkbox") +
         field("edit_images", t("field.supportsImages"), m.supports_attachments, "checkbox") +
         "</div>" +
+        field("edit_effort", t("field.defaultReasoningEffort"), m.default_reasoning_effort || "", "select", {
+          options: effortOptions(true),
+          hint: t("hint.default_reasoning_effort"),
+        }) +
         '<div class="discover-row">' +
+        '<button type="button" class="ghost small model-max-limits" title="' +
+        esc(t("hint.maxModelLimits")) +
+        '">' +
+        esc(t("btn.maxLimits")) +
+        "</button>" +
         '<button type="button" class="primary small model-save">' +
         esc(t("btn.apply")) +
         "</button>" +
@@ -1084,6 +1387,7 @@
       '<div class="hint">' +
       esc(t("hint.model_id")) +
       "</div></div>";
+    bindWidgets(box);
     bindModelEditor(pid);
   }
 
@@ -1184,6 +1488,16 @@
         paintModelEditor(pid);
       };
     });
+    document.querySelectorAll(".model-max-limits").forEach(function (btn) {
+      btn.onclick = function () {
+        var ctxEl = $("f-edit_ctx");
+        var maxEl = $("f-edit_max");
+        var ctx = Number(ctxEl && ctxEl.value);
+        if (!isFinite(ctx) || ctx <= 0) ctx = DEFAULT_CONTEXT_WINDOW;
+        if (ctxEl) ctxEl.value = ctx;
+        if (maxEl) maxEl.value = ctx;
+      };
+    });
     document.querySelectorAll(".model-save").forEach(function (btn) {
       btn.onclick = function () {
         var chip = btn.closest("[data-model-id]");
@@ -1196,6 +1510,7 @@
           default_max_tokens: Number(val("edit_max") || 0),
           can_reason: val("edit_reason"),
           supports_attachments: val("edit_images"),
+          default_reasoning_effort: val("edit_effort") || undefined,
           cost_per_1m_in: Number(val("edit_price_in") || 0),
         }).then(function () {
           state.editingModel = null;
@@ -1801,7 +2116,12 @@
         if (next && next.lastWrite && next.lastWrite.path) {
           showStatus(t("status.saved", { path: next.lastWrite.path }), "ok");
         }
-        if (!skipRefresh) return refresh(true);
+        if (!skipRefresh) {
+          return refresh(true).then(function () {
+            return next;
+          });
+        }
+        return next;
       })
       .catch(function (err) {
         showStatus(err.message || String(err), "error");

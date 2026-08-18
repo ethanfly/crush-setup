@@ -286,7 +286,9 @@ function reload(session) {
 function apply(session, op, args) {
   if (!session.overlay) session.overlay = emptyDocument();
   session.overlay = applyOp(session.overlay, op, args);
-  if (op === "setModelSlot") patchMachineModelSlots(session);
+  if (op === "setModelSlot" || op === "setMaxReasoning" || op === "setMaxLimits") {
+    patchMachineModelSlots(session);
+  }
   session.document = rebuildDocument(session);
   return session;
 }

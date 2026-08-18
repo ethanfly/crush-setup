@@ -13,6 +13,7 @@ const {
   DIFF_MODES,
   SCROLLBAR_MODES,
   REASONING_EFFORTS,
+  MAX_REASONING_EFFORT,
   OPTION_SPECS,
 } = require("./constants");
 
@@ -31,6 +32,7 @@ function createHost() {
         diffModes: DIFF_MODES,
         scrollbarModes: SCROLLBAR_MODES,
         reasoningEfforts: REASONING_EFFORTS,
+        maxReasoningEffort: MAX_REASONING_EFFORT,
         optionKeys: Object.keys(OPTION_SPECS),
       };
     },

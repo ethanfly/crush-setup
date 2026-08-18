@@ -1,6 +1,6 @@
 "use strict";
 
-const { OPTION_SPECS } = require("./constants");
+const { OPTION_SPECS, MAX_REASONING_EFFORT, MODEL_SLOTS, DEFAULT_CONTEXT_WINDOW } = require("./constants");
 const { clone, asMap, asArray, uniqueStrings, ensureOptions } = require("./document");
 
 function upsertProvider(doc, provider) {
@@ -35,7 +35,7 @@ function defaultModel(partial) {
     cost_per_1m_out: partial.cost_per_1m_out ?? 0,
     cost_per_1m_in_cached: partial.cost_per_1m_in_cached ?? 0,
     cost_per_1m_out_cached: partial.cost_per_1m_out_cached ?? 0,
-    context_window: partial.context_window ?? 128000,
+    context_window: partial.context_window ?? DEFAULT_CONTEXT_WINDOW,
     default_max_tokens: partial.default_max_tokens ?? 4096,
     can_reason: Boolean(partial.can_reason),
     supports_attachments: Boolean(partial.supports_attachments),
@@ -69,6 +69,87 @@ function setModelSlot(doc, slot, selection) {
   const { provider, model, ...rest } = selection;
   if (!provider || !model) throw new Error("model slot requires provider and model");
   next.models[slot] = { provider, model, ...rest };
+  return next;
+}
+
+function slotSelection(source, slot) {
+  return asMap(asMap(source)[slot]);
+}
+
+/** Turn thinking on at maximum Crush-documented effort for assigned slots. */
+function setMaxReasoning(doc, selections) {
+  const next = clone(doc);
+  next.models = asMap(next.models);
+  const incoming = asMap(selections);
+  let touched = 0;
+  for (const slot of MODEL_SLOTS) {
+    const sel = Object.keys(incoming).length ? slotSelection(incoming, slot) : asMap(next.models[slot]);
+    if (!sel.provider || !sel.model) continue;
+    next.models[slot] = {
+      ...asMap(next.models[slot]),
+      ...sel,
+      think: true,
+      reasoning_effort: MAX_REASONING_EFFORT,
+    };
+    touched += 1;
+  }
+  if (!touched) throw new Error("no model slots to set");
+  return next;
+}
+
+function positiveInt(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.floor(n);
+}
+
+function patchCatalogModel(doc, providerId, modelId, patch) {
+  if (!providerId || !modelId) throw new Error("patchModel requires provider and model id");
+  doc.providers = asMap(doc.providers);
+  if (!doc.providers[providerId]) doc.providers[providerId] = {};
+  const p = doc.providers[providerId];
+  const models = asArray(p.models);
+  const idx = models.findIndex((m) => m && m.id === modelId);
+  const existing = idx >= 0 ? asMap(models[idx]) : { id: modelId };
+  const updated = { ...existing, ...clone(asMap(patch)), id: modelId };
+  if (idx >= 0) models[idx] = updated;
+  else models.push(updated);
+  p.models = models;
+}
+
+/** Merge fields onto one catalog model without rewriting sibling keys. */
+function patchModel(doc, providerId, modelId, patch) {
+  const next = clone(doc);
+  patchCatalogModel(next, providerId, modelId, patch);
+  return next;
+}
+
+/** Set slot max_tokens (and matching catalog default) to the supplied maxima. */
+function setMaxLimits(doc, selections) {
+  const next = clone(doc);
+  next.models = asMap(next.models);
+  const incoming = asMap(selections);
+  const hasIncoming = Boolean(incoming.large || incoming.small);
+  let touched = 0;
+  for (const slot of MODEL_SLOTS) {
+    const sel = hasIncoming ? slotSelection(incoming, slot) : asMap(next.models[slot]);
+    if (!sel.provider || !sel.model) continue;
+    const maxTokens = positiveInt(sel.max_tokens);
+    if (maxTokens == null) continue;
+    const ctx = positiveInt(sel.context_window);
+    const { context_window: _ctx, ...slotFields } = sel;
+    void _ctx;
+    next.models[slot] = {
+      ...asMap(next.models[slot]),
+      ...slotFields,
+      max_tokens: maxTokens,
+    };
+    const catalog = { default_max_tokens: maxTokens };
+    if (ctx != null) catalog.context_window = ctx;
+    patchCatalogModel(next, sel.provider, sel.model, catalog);
+    touched += 1;
+  }
+  if (!touched) throw new Error("no model slots to set");
   return next;
 }
 
@@ -269,6 +350,9 @@ const OPS = {
   upsertModel,
   removeModel,
   setModelSlot,
+  setMaxReasoning,
+  patchModel,
+  setMaxLimits,
   upsertMcp,
   removeMcp,
   setMcpDisabled,
